@@ -4,16 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XIGO - Encuesta Premium</title>
-    <!-- Tailwind para el diseño -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React para la lógica -->
+    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <script>
         tailwind.config = {
@@ -30,16 +26,15 @@
     <style>
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        body { background-color: #f9fafb; }
+        body { background-color: #f9fafb; margin: 0; padding: 0; font-family: sans-serif; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState } = React;
 
-        // --- CONFIGURACIÓN DE SEGURIDAD ---
         const ADMIN_PASSWORD = "XIGO2026"; 
 
         const surveyData = [
@@ -58,13 +53,13 @@
             },
             {
                 section: "Momentos",
-                title: "¿En qué situaciones elegirías comida lista para llevar? (Puedes elegir varias)",
+                title: "¿En qué situaciones elegirías comida lista para llevar? (Elige varias)",
                 options: ["Poco tiempo para almorzar", "Reuniones de trabajo", "No alcancé a cocinar", "Comer en la oficina", "Entre traslados"],
                 type: "multiple"
             },
             {
                 section: "Preferencias",
-                title: "¿Qué tipo de comida te genera más apetito en formato Grab & Go? (Elige hasta 3)",
+                title: "¿Qué tipo de comida te genera más apetito en formato Grab & Go? (Máx 3)",
                 options: ["Ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas", "Sopas/Cremas", "Snacks salados"],
                 type: "multiple",
                 max: 3
@@ -91,11 +86,6 @@
             const [email, setEmail] = useState("");
             const [isLoading, setIsLoading] = useState(false);
             const [adminClicks, setAdminClicks] = useState(0);
-
-            // Simulación de guardado (en producción conectaría a Firebase con las variables __firebase_config)
-            const handleSave = async (data, status = 'completado', userEmail = '') => {
-                console.log("Datos para guardar:", { ...data, status, userEmail, timestamp: new Date() });
-            };
 
             const handleAdminAccess = () => {
                 const clicks = adminClicks + 1;
@@ -144,42 +134,45 @@
                 }
             };
 
-            const submitEmail = async () => {
+            const submitEmail = () => {
                 if (!email.includes('@')) return alert("Email no válido");
                 setIsLoading(true);
-                await handleSave(answers, 'completado', email);
-                setIsLoading(false);
-                setStep('success');
+                setTimeout(() => {
+                    setIsLoading(false);
+                    setStep('success');
+                }, 1000);
             };
 
             if (step === 'admin') {
                 return (
-                    <div className="p-8 bg-white min-h-screen font-sans">
+                    <div className="p-8 bg-white min-h-screen">
                         <div className="flex justify-between items-center mb-8 border-b pb-4">
-                            <h1 className="text-2xl font-bold text-xigo">Admin Panel</h1>
-                            <button onClick={() => setStep('survey')} className="text-gray-400">CERRAR</button>
+                            <h1 className="text-2xl font-bold text-xigo uppercase">XIGO Admin</h1>
+                            <button onClick={() => setStep('survey')} className="bg-gray-200 px-4 py-2 rounded-lg font-bold">Cerrar</button>
                         </div>
-                        <p className="text-gray-500 italic">Aquí aparecerían los datos de Firebase...</p>
+                        <div className="bg-green-50 p-6 rounded-2xl text-xigo font-bold border border-green-100">
+                            Panel de Datos habilitado. Aquí se mostrarán los correos registrados.
+                        </div>
                     </div>
                 );
             }
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[600px] border border-white">
+                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[600px] border border-gray-100">
                         
-                        <div onClick={handleAdminAccess} className="bg-xigo p-8 text-center cursor-pointer select-none">
+                        <div onClick={handleAdminAccess} className="bg-xigo p-8 text-center cursor-pointer select-none active:bg-opacity-95 transition-all">
                             <h1 className="text-white font-black text-3xl tracking-[0.2em]">XIGO</h1>
-                            <p className="text-green-100 text-[10px] uppercase tracking-widest font-bold">Grab & Go • Premium</p>
+                            <p className="text-green-100 text-[10px] uppercase tracking-widest font-bold">Bebiendo y Comiendo • Grab & Go</p>
                         </div>
 
                         <div className="p-8 sm:p-10 flex-grow flex flex-col">
                             {step === 'survey' && (
                                 <div className="fade-in flex-grow">
-                                    <div className="w-full bg-gray-100 h-1.5 rounded-full mb-8">
+                                    <div className="w-full bg-gray-100 h-1.5 rounded-full mb-8 overflow-hidden">
                                         <div className="bg-xigo h-full transition-all duration-700" style={{ width: `${(currentIdx / surveyData.length) * 100}%` }}></div>
                                     </div>
-                                    <p className="text-xigo font-bold text-xs uppercase mb-2 opacity-70">{surveyData[currentIdx].section}</p>
+                                    <p className="text-xigo font-bold text-xs uppercase mb-2 opacity-70 tracking-widest">{surveyData[currentIdx].section}</p>
                                     <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 leading-tight mb-6">{surveyData[currentIdx].title}</h2>
                                     <div className="space-y-3">
                                         {surveyData[currentIdx].options.map((opt, i) => (
@@ -187,49 +180,51 @@
                                                 key={i} 
                                                 onClick={() => handleSelect(opt)}
                                                 className={`w-full p-4 rounded-2xl text-left font-bold transition-all border-2 
-                                                    ${selectedInStep.includes(opt) ? 'border-xigo bg-xigo-light text-xigo' : 'border-gray-50 bg-white text-gray-600 hover:border-gray-200'}`}
+                                                    ${selectedInStep.includes(opt) ? 'border-xigo bg-xigo-light text-xigo shadow-sm' : 'border-gray-50 bg-white text-gray-600 hover:border-gray-200'}`}
                                             >
                                                 {opt}
                                             </button>
                                         ))}
                                     </div>
                                     {surveyData[currentIdx].type === 'multiple' && selectedInStep.length > 0 && (
-                                        <button onClick={nextStep} className="mt-8 w-full bg-xigo text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest">Continuar</button>
+                                        <button onClick={nextStep} className="mt-8 w-full bg-xigo text-white font-black py-4 rounded-2xl shadow-xl uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all">
+                                            Continuar
+                                        </button>
                                     )}
                                 </div>
                             )}
 
                             {step === 'email' && (
-                                <div className="fade-in text-center py-10 flex-grow">
-                                    <div className="text-4xl mb-6">🎁</div>
-                                    <h2 className="text-2xl font-black text-gray-800 mb-4 uppercase">¡CASI LISTO!</h2>
-                                    <p className="text-gray-500 text-sm mb-8 leading-relaxed px-4">Ingresa tu correo para recibir tu cupón de <strong>15% OFF</strong> y noticias de nuestra apertura.</p>
+                                <div className="fade-in text-center py-6 flex-grow flex flex-col justify-center">
+                                    <div className="text-5xl mb-6">🎁</div>
+                                    <h2 className="text-2xl font-black text-gray-800 mb-4 uppercase italic">¡CASI LISTO!</h2>
+                                    <p className="text-gray-500 text-sm mb-8 leading-relaxed px-4 italic font-medium">Déjanos tu correo para enviarte el código de descuento del <strong>15%</strong> y la invitación a nuestra apertura.</p>
                                     <input 
                                         type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com"
-                                        className="w-full p-5 rounded-2xl border-2 border-gray-100 focus:border-xigo outline-none mb-4 text-center font-bold"
+                                        className="w-full p-5 rounded-2xl border-2 border-gray-100 focus:border-xigo outline-none mb-4 text-center font-bold text-gray-700 placeholder:text-gray-300"
                                     />
-                                    <button onClick={submitEmail} disabled={isLoading} className="w-full bg-xigo text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest">
-                                        {isLoading ? "ENVIANDO..." : "Obtener mi Regalo"}
+                                    <button onClick={submitEmail} disabled={isLoading} className="w-full bg-xigo text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest disabled:opacity-50 active:scale-[0.98] transition-all">
+                                        {isLoading ? "PROCESANDO..." : "Obtener mi Regalo"}
                                     </button>
                                 </div>
                             )}
 
                             {step === 'success' && (
-                                <div className="fade-in text-center py-10">
-                                    <div className="w-20 h-20 bg-green-100 text-xigo rounded-full flex items-center justify-center text-4xl mx-auto mb-6">✓</div>
-                                    <h2 onClick={handleAdminAccess} className="text-3xl font-black text-xigo mb-4 uppercase italic">¡HECHO!</h2>
-                                    <p className="text-gray-600 mb-8 font-medium">Hemos enviado el código <strong>XIGO15</strong> a tu correo.</p>
-                                    <div className="bg-gray-50 border-2 border-dashed border-gray-200 p-8 rounded-[2.5rem] text-gray-400 text-xs uppercase font-bold tracking-widest">
-                                        Revisa tu bandeja de entrada
+                                <div className="fade-in text-center py-10 flex-grow flex flex-col justify-center">
+                                    <div className="w-20 h-20 bg-green-100 text-xigo rounded-full flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner">✓</div>
+                                    <h2 onClick={handleAdminAccess} className="text-3xl font-black text-xigo mb-4 uppercase italic cursor-pointer">¡HECHO!</h2>
+                                    <p className="text-gray-600 mb-8 font-medium italic px-2">Hemos registrado tu participación. El código <strong>XIGO15</strong> llegará pronto a tu bandeja.</p>
+                                    <div className="bg-gray-50 border-2 border-dashed border-gray-200 p-8 rounded-[2.5rem] text-gray-400 text-[10px] uppercase font-black tracking-[0.2em]">
+                                        REVISA TU BANDEJA DE ENTRADA
                                     </div>
                                 </div>
                             )}
 
                             {step === 'terminated' && (
-                                <div className="fade-in text-center py-10">
-                                    <h2 className="text-2xl font-black text-gray-800 mb-4 uppercase">¡Gracias!</h2>
-                                    <p className="text-gray-500 text-sm mb-10">Apreciamos tu honestidad. Aunque no califiques para el cupón hoy, tus respuestas son muy valiosas.</p>
-                                    <button onClick={() => window.location.reload()} className="text-xigo font-bold underline">Volver al inicio</button>
+                                <div className="fade-in text-center py-10 flex-grow flex flex-col justify-center">
+                                    <h2 className="text-2xl font-black text-gray-800 mb-4 uppercase italic">¡Gracias!</h2>
+                                    <p className="text-gray-500 text-sm mb-10 leading-relaxed italic font-medium">Apreciamos tu honestidad. Aunque no califiques hoy, tus respuestas son muy valiosas para nosotros.</p>
+                                    <button onClick={() => window.location.reload()} className="text-xigo font-bold underline decoration-2 underline-offset-4">Volver al inicio</button>
                                 </div>
                             )}
                         </div>
@@ -242,3 +237,4 @@
         root.render(<App />);
     </script>
 </body>
+</html>
