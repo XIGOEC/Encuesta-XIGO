@@ -1,226 +1,333 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XIGO - Encuesta de Consumo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root { --xigo-green: #2D5A27; --xigo-light: #f0fdf4; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9fafb; }
-        .bg-xigo { background-color: var(--xigo-green); }
-        .text-xigo { color: var(--xigo-green); }
-        .option-card { 
-            transition: all 0.2s ease; 
-            border: 2px solid #f3f4f6; 
-            cursor: pointer;
-            background-color: white;
-        }
-        .option-card:hover { border-color: #d1d5db; }
-        .option-card.selected { 
-            border-color: var(--xigo-green); 
-            background-color: var(--xigo-light); 
-            transform: scale(1.02);
-        }
-        .fade-in { animation: fadeIn 0.4s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body class="min-h-screen flex items-center justify-center p-2 sm:p-4">
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
 
-    <div id="app" class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[600px]">
+// --- CONFIGURACIÓN DE SEGURIDAD ---
+const ADMIN_PASSWORD = "XIGO2026"; // <--- CAMBIA TU CONTRASEÑA AQUÍ
+
+// --- CONFIGURACIÓN DE FIREBASE ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-survey-default';
+
+const surveyData = [
+  {
+    section: "Bloque 0 - Filtro",
+    title: "¿En los últimos 30 días, has comprado comida preparada para consumir fuera de casa, trabajo o universidad?",
+    options: ["Sí, lo he comprado", "No, pero lo consideraría si fuera conveniente", "No, no me interesa"],
+    type: "single",
+    terminateIf: "No, no me interesa"
+  },
+  {
+    section: "Bloque 1 - Estilo de Vida",
+    title: "¿Cuál describe mejor tu situación actual?",
+    options: ["Trabajo fuera de casa", "Trabajo desde casa/online", "Trabajo mixto", "Estudiante / No trabajo"],
+    type: "single"
+  },
+  {
+    section: "Bloque 1 - Comida",
+    title: "¿Has comprado alguna vez comida preparada para consumir después (Refrigerada/Empacada)?",
+    options: ["Sí, regularmente", "Sí, algunas veces", "No, pero me llama la atención", "No, no me interesa"],
+    type: "single"
+  },
+  {
+    section: "Bloque 1 - Momentos",
+    title: "¿En qué situaciones elegirías comida lista para llevar? (Puedes elegir varias)",
+    options: ["Poco tiempo para almorzar", "Reuniones de trabajo", "No alcancé a cocinar", "Comer en la oficina", "Entre traslados", "Para llevar a casa"],
+    type: "multiple"
+  },
+  {
+    section: "Bloque 1 - Preferencias",
+    title: "¿Qué tipo de comida te genera más apetito en formato Grab & Go? (Elige hasta 3)",
+    options: ["Ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas", "Sopas/Cremas", "Snacks salados"],
+    type: "multiple",
+    max: 3
+  },
+  {
+    section: "Bloque 2 - Precios",
+    title: "¿Qué precio te parece razonable para un almuerzo fresco y de calidad?",
+    options: ["$5.99 - $7.99", "$7.99 - $9.99", "$9.99 - $11.99", "$12.00+"],
+    type: "single"
+  },
+  {
+    section: "Bloque 2 - Elasticidad",
+    title: "Si un almuerzo de $5.99 sube a $7.99 por costos de ingredientes, ¿qué harías?",
+    options: ["Lo seguiría comprando igual", "Lo compraría con menos frecuencia", "Buscaría otra opción", "Dejaría de comprarlo"],
+    type: "single"
+  },
+  {
+    section: "Bloque 3 - Bebidas",
+    title: "¿Cuál de estas opciones de bebida te resultaría más atractiva? (Elige 2)",
+    options: ["Agua natural/saborizada", "Jugo natural prensado", "Té frío / Infusión", "Café latte / Macha", "Bebida funcional", "Bebida refrescante"],
+    type: "multiple",
+    max: 2
+  },
+  {
+    section: "Bloque 3 - Lácteos",
+    title: "¿Qué tipo de leche prefieres en tus bebidas? (Elige hasta 2)",
+    options: ["Leche entera", "Deslactosada", "Almendra", "Avena", "Soya", "No consumo leche"],
+    type: "multiple",
+    max: 2
+  },
+  {
+    section: "Bloque 4 - Perfil",
+    title: "¿En qué zona de Guayaquil realizas tus actividades principales?",
+    options: ["Norte", "Centro", "Sur", "Samborondón", "Vía a la Costa", "Durán"],
+    type: "single"
+  },
+  {
+    section: "Bloque 4 - Perfil",
+    title: "Rango de edad",
+    options: ["18-24", "25-34", "35-44", "45-54", "55+"],
+    type: "single"
+  }
+];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [step, setStep] = useState('survey'); 
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [selectedInStep, setSelectedInStep] = useState([]);
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [allData, setAllData] = useState([]);
+  const [clickCount, setClickCount] = useState(0);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user || step !== 'admin') return;
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'respuestas');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllData(data);
+    }, (error) => console.error("Error fetching data:", error));
+    return () => unsubscribe();
+  }, [user, step]);
+
+  const handleAdminAccess = () => {
+    const newCount = clickCount + 1;
+    if (newCount >= 5) {
+      const pass = prompt("Introduce la clave de acceso de XIGO:");
+      if (pass === ADMIN_PASSWORD) {
+        setStep('admin');
+      } else {
+        alert("Clave incorrecta.");
+      }
+      setClickCount(0);
+    } else {
+      setClickCount(newCount);
+    }
+  };
+
+  const saveData = async (finalAnswers, status = 'completado', userEmail = '') => {
+    if (!user) return;
+    const payload = {
+      ...finalAnswers,
+      email: userEmail,
+      status,
+      timestamp: new Date().toISOString(),
+      userId: user.uid
+    };
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'respuestas'), payload);
+    } catch (e) {
+      console.error("Error al guardar:", e);
+    }
+  };
+
+  const handleSelect = (val) => {
+    const q = surveyData[currentIdx];
+    if (q.type === 'single') {
+      const newAnswers = { ...answers, [q.title]: val };
+      setAnswers(newAnswers);
+      setSelectedInStep([val]);
+      if (q.terminateIf && val === q.terminateIf) {
+        saveData(newAnswers, 'terminado_temprano');
+        setStep('terminated');
+      } else {
+        setTimeout(() => nextStep(newAnswers), 400);
+      }
+    } else {
+      let updated = selectedInStep.includes(val) 
+        ? selectedInStep.filter(i => i !== val) 
+        : (q.max && selectedInStep.length >= q.max ? selectedInStep : [...selectedInStep, val]);
+      setSelectedInStep(updated);
+      setAnswers({ ...answers, [q.title]: updated });
+    }
+  };
+
+  const nextStep = () => {
+    if (currentIdx < surveyData.length - 1) {
+      setCurrentIdx(currentIdx + 1);
+      setSelectedInStep([]);
+    } else {
+      setStep('email');
+    }
+  };
+
+  const submitEmail = async () => {
+    if (!email.includes('@')) return;
+    setIsLoading(true);
+    await saveData(answers, 'completado', email);
+    setIsLoading(false);
+    setStep('success');
+  };
+
+  const downloadCSV = () => {
+    if (allData.length === 0) return;
+    const allKeys = new Set();
+    allData.forEach(d => Object.keys(d).forEach(k => allKeys.add(k)));
+    const headers = Array.from(allKeys).filter(k => k !== 'id');
+    const csvRows = [headers.join(','), ...allData.map(row => headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(','))];
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `datos_xigo_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  if (step === 'admin') {
+    return (
+      <div className="p-6 bg-white min-h-screen">
+        <div className="flex justify-between items-center mb-8 border-b pb-4">
+          <h1 className="text-2xl font-bold text-xigo">Resultados XIGO</h1>
+          <button onClick={() => setStep('survey')} className="text-gray-400 font-bold hover:text-gray-600">CERRAR</button>
+        </div>
+        <div className="flex flex-wrap gap-4 mb-8">
+          <button onClick={downloadCSV} className="bg-xigo text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition-all">
+            Descargar CSV para Drive / Excel
+          </button>
+          <div className="bg-gray-50 px-6 py-3 rounded-xl border border-gray-100 flex items-center">
+            <span className="text-gray-500 text-sm font-medium">Total de registros: <strong className="text-xigo">{allData.length}</strong></span>
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 text-gray-400 uppercase tracking-widest">
+                <th className="p-4 text-left border-b">Fecha</th>
+                <th className="p-4 text-left border-b">Email</th>
+                <th className="p-4 text-left border-b">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allData.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((d, i) => (
+                <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="p-4 text-gray-400">{new Date(d.timestamp).toLocaleString()}</td>
+                  <td className="p-4 font-bold text-gray-800">{d.email || 'Anónimo'}</td>
+                  <td className="p-4">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${d.status === 'completado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {d.status.toUpperCase()}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 font-sans text-gray-900">
+      <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden flex flex-col min-h-[650px] border border-white">
         
-        <!-- ENCABEZADO CON LOGO -->
-        <div class="bg-xigo p-6 text-center flex flex-col items-center">
-            <!-- Espacio para el Logo -->
-            <div class="mb-2">
-                <img src="logo-xigo.png" alt="XIGO Logo" onerror="this.style.display='none'" class="h-16 w-auto mb-2">
-            </div>
-            <h1 class="text-white font-black text-3xl tracking-[0.2em] mb-1">XIGO</h1>
-            <p class="text-green-100 text-[10px] uppercase tracking-widest font-bold italic">Bebiendo y Comiendo • Grab & Go</p>
+        {/* HEADER - Haz 5 clics aquí para entrar como Admin */}
+        <div onClick={handleAdminAccess} className="bg-xigo p-8 text-center relative overflow-hidden cursor-pointer active:opacity-90 transition-opacity">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
+          <h1 className="text-white font-black text-4xl tracking-[0.25em] mb-1">XIGO</h1>
+          <p className="text-green-100 text-[10px] uppercase tracking-widest font-bold opacity-80 italic">Grab & Go • Calidad Premium</p>
         </div>
 
-        <!-- CUERPO DE LA ENCUESTA -->
-        <div class="p-6 sm:p-10 flex-grow flex flex-col">
-            <div id="progress-container" class="w-full bg-gray-100 h-2 rounded-full mb-8">
-                <div id="progress-bar" class="bg-xigo h-2 rounded-full transition-all duration-700 w-0"></div>
+        <div className="p-8 sm:p-12 flex-grow flex flex-col">
+          {step === 'survey' && (
+            <div className="fade-in flex-grow">
+              <div className="w-full bg-gray-100 h-1 rounded-full mb-10 overflow-hidden">
+                <div className="bg-xigo h-full transition-all duration-1000" style={{ width: `${(currentIdx / surveyData.length) * 100}%` }}></div>
+              </div>
+              <p className="text-xigo font-black text-[10px] uppercase mb-3 tracking-widest">{surveyData[currentIdx].section}</p>
+              <h2 className="text-2xl font-black text-gray-800 leading-[1.1] mb-8">{surveyData[currentIdx].title}</h2>
+              <div className="space-y-3">
+                {surveyData[currentIdx].options.map((opt, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => handleSelect(opt)}
+                    className={`w-full p-5 rounded-2xl text-left font-bold transition-all border-2 text-sm
+                      ${selectedInStep.includes(opt) ? 'border-xigo bg-green-50 text-xigo' : 'border-gray-50 bg-white text-gray-600 hover:border-gray-200'}`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              {surveyData[currentIdx].type === 'multiple' && selectedInStep.length > 0 && (
+                <button onClick={nextStep} className="mt-8 w-full bg-xigo text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest hover:opacity-90">Continuar</button>
+              )}
             </div>
+          )}
 
-            <div id="survey-content" class="fade-in flex-grow">
-                <p id="section-label" class="text-xigo font-bold text-xs uppercase mb-2 tracking-tighter opacity-70"></p>
-                <h2 id="question-title" class="text-xl sm:text-2xl font-extrabold text-gray-800 leading-tight mb-6">Cargando encuesta...</h2>
-                <div id="options-space" class="grid grid-cols-1 gap-3"></div>
+          {step === 'email' && (
+            <div className="fade-in text-center py-10">
+              <div className="text-4xl mb-6">🎁</div>
+              <h2 className="text-2xl font-black text-gray-800 mb-2 uppercase italic">¡Excelente!</h2>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">Solo déjanos tu correo para enviarte el código de descuento del <strong>15%</strong> y la invitación a nuestra apertura.</p>
+              <input 
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com"
+                className="w-full p-5 rounded-2xl border-2 border-gray-100 focus:border-xigo outline-none mb-4 text-center font-bold text-gray-800"
+              />
+              <button onClick={submitEmail} disabled={isLoading} className="w-full bg-xigo text-white font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest disabled:opacity-50">
+                {isLoading ? "Guardando..." : "Obtener mi Regalo"}
+              </button>
             </div>
+          )}
 
-            <div class="mt-8">
-                <button id="next-btn" onclick="handleNext()" class="hidden w-full bg-xigo text-white font-black py-5 rounded-2xl shadow-xl hover:opacity-90 transition-all uppercase tracking-widest">
-                    Continuar
-                </button>
-                <p id="hint-text" class="text-center text-gray-400 text-[10px] mt-4 italic uppercase tracking-wider"></p>
+          {step === 'success' && (
+            <div className="fade-in text-center py-10">
+              <div className="w-20 h-20 bg-green-100 text-xigo rounded-full flex items-center justify-center text-3xl mx-auto mb-8">✓</div>
+              <h2 onClick={handleAdminAccess} className="text-3xl font-black text-xigo mb-4 uppercase italic cursor-pointer">¡TODO LISTO!</h2>
+              <p className="text-gray-600 mb-8 font-medium">Hemos registrado tu participación. El código <strong>XIGO15</strong> llegará pronto a <br/><span className="text-xigo font-bold">{email}</span></p>
+              <div className="bg-gray-50 border-2 border-dashed border-gray-200 p-8 rounded-[2.5rem]">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Revisa tu bandeja de entrada</p>
+              </div>
             </div>
+          )}
+
+          {step === 'terminated' && (
+            <div className="fade-in text-center py-10">
+              <h2 className="text-2xl font-black text-gray-800 mb-4 uppercase italic">¡Gracias!</h2>
+              <p className="text-gray-500 text-sm mb-10 leading-relaxed">Apreciamos tu tiempo. Tus respuestas nos ayudan a entender mejor el mercado aunque hoy no califiques para la promoción.</p>
+              <button onClick={() => window.location.reload()} className="text-xigo font-bold underline">Volver al inicio</button>
+            </div>
+          )}
         </div>
+      </div>
     </div>
-
-    <script>
-        const surveyData = [
-            {
-                section: "Bloque 0 - Filtro",
-                title: "¿En los últimos 30 días, has comprado comida preparada para consumir fuera de casa, trabajo o universidad?",
-                options: ["Sí, lo he comprado", "No, pero lo consideraría si fuera conveniente", "No, no me interesa"],
-                type: "single",
-                terminateIf: "No, no me interesa"
-            },
-            {
-                section: "Bloque 1 - Estilo de Vida",
-                title: "¿Cuál describe mejor tu situación actual?",
-                options: ["Trabajo fuera de casa", "Trabajo desde casa/online", "Trabajo mixto", "Estudiante / No trabajo"],
-                type: "single"
-            },
-            {
-                section: "Bloque 1 - Comida",
-                title: "¿Has comprado alguna vez comida preparada para consumir después (Refrigerada/Empacada)?",
-                options: ["Sí, regularmente", "Sí, algunas veces", "No, pero me llama la atención", "No, no me interesa"],
-                type: "single"
-            },
-            {
-                section: "Bloque 1 - Momentos",
-                title: "¿En qué situaciones elegirías comida lista para llevar? (Puedes elegir varias)",
-                options: ["Poco tiempo para almorzar", "Reuniones de trabajo", "No alcancé a cocinar", "Comer en la oficina", "Entre traslados", "Para llevar a casa"],
-                type: "multiple"
-            },
-            {
-                section: "Bloque 1 - Preferencias",
-                title: "¿Qué tipo de comida te genera más apetito en formato Grab & Go? (Elige hasta 3)",
-                options: ["Ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas", "Sopas/Cremas", "Snacks salados"],
-                type: "multiple",
-                max: 3
-            },
-            {
-                section: "Bloque 2 - Precios",
-                title: "¿Qué precio te parece razonable para un almuerzo fresco y de calidad?",
-                options: ["$5.99 - $7.99", "$7.99 - $9.99", "$9.99 - $11.99", "$12.00+"],
-                type: "single"
-            },
-            {
-                section: "Bloque 2 - Elasticidad",
-                title: "Si un almuerzo de $5.99 sube a $7.99 por costos de ingredientes, ¿qué harías?",
-                options: ["Lo seguiría comprando igual", "Lo compraría con menos frecuencia", "Buscaría otra opción", "Dejaría de comprarlo"],
-                type: "single"
-            },
-            {
-                section: "Bloque 3 - Bebidas",
-                title: "¿Cuál de estas opciones de bebida te resultaría más atractiva? (Elige 2)",
-                options: ["Agua natural/saborizada", "Jugo natural prensado", "Té frío / Infusión", "Café latte / Macha", "Bebida funcional", "Bebida refrescante"],
-                type: "multiple",
-                max: 2
-            },
-            {
-                section: "Bloque 3 - Lácteos",
-                title: "¿Qué tipo de leche prefieres en tus bebidas? (Elige hasta 2)",
-                options: ["Leche entera", "Deslactosada", "Almendra", "Avena", "Soya", "No consumo leche"],
-                type: "multiple",
-                max: 2
-            },
-            {
-                section: "Bloque 4 - Perfil",
-                title: "¿En qué zona de Guayaquil realizas tus actividades principales?",
-                options: ["Norte", "Centro", "Sur", "Samborondón", "Vía a la Costa", "Durán"],
-                type: "single"
-            },
-            {
-                section: "Bloque 4 - Perfil",
-                title: "Rango de edad",
-                options: ["18-24", "25-34", "35-44", "45-54", "55+"],
-                type: "single"
-            }
-        ];
-
-        let currentIdx = 0;
-        let selectedOptions = [];
-
-        function renderQuestion() {
-            const q = surveyData[currentIdx];
-            const content = document.getElementById('survey-content');
-            content.classList.remove('fade-in');
-            void content.offsetWidth; 
-            content.classList.add('fade-in');
-
-            document.getElementById('section-label').innerText = q.section;
-            document.getElementById('question-title').innerText = q.title;
-            document.getElementById('hint-text').innerText = q.type === 'multiple' ? `Selecciona hasta ${q.max || 'varias'} opciones.` : "Selecciona una respuesta.";
-            
-            const space = document.getElementById('options-space');
-            space.innerHTML = '';
-            selectedOptions = [];
-            document.getElementById('next-btn').classList.add('hidden');
-
-            q.options.forEach(opt => {
-                const div = document.createElement('div');
-                div.className = "option-card p-4 sm:p-5 rounded-2xl font-bold text-gray-700 shadow-sm text-sm sm:text-base";
-                div.innerText = opt;
-                div.onclick = () => selectOption(div, opt, q.type);
-                space.appendChild(div);
-            });
-
-            const progress = (currentIdx / surveyData.length) * 100;
-            document.getElementById('progress-bar').style.width = `${progress}%`;
-        }
-
-        function selectOption(element, val, type) {
-            const q = surveyData[currentIdx];
-            if (type === 'single') {
-                if (q.terminateIf && val === q.terminateIf) { terminateSurvey(); return; }
-                document.querySelectorAll('.option-card').forEach(el => el.classList.remove('selected'));
-                element.classList.add('selected');
-                selectedOptions = [val];
-                setTimeout(handleNext, 400); 
-            } else {
-                if (selectedOptions.includes(val)) {
-                    selectedOptions = selectedOptions.filter(i => i !== val);
-                    element.classList.remove('selected');
-                } else {
-                    if (q.max && selectedOptions.length >= q.max) return; 
-                    selectedOptions.push(val);
-                    element.classList.add('selected');
-                }
-                if (selectedOptions.length > 0) document.getElementById('next-btn').classList.remove('hidden');
-                else document.getElementById('next-btn').classList.add('hidden');
-            }
-        }
-
-        function handleNext() {
-            currentIdx++;
-            if (currentIdx < surveyData.length) renderQuestion();
-            else {
-                document.getElementById('progress-bar').style.width = `100%`;
-                showSuccess();
-            }
-        }
-
-        function terminateSurvey() {
-            document.getElementById('app').innerHTML = `
-                <div class="p-12 text-center fade-in">
-                    <div class="w-20 h-20 bg-green-50 text-xigo rounded-full flex items-center justify-center text-4xl mx-auto mb-6">♥</div>
-                    <h2 class="text-2xl font-black text-gray-800 mb-4 uppercase italic">¡Gracias por participar!</h2>
-                    <p class="text-gray-500 leading-relaxed text-sm">Apreciamos mucho tu tiempo y honestidad. Tus respuestas son muy valiosas para nosotros.</p>
-                    <button onclick="location.reload()" class="mt-8 text-xigo font-bold underline">Cerrar</button>
-                </div>`;
-        }
-
-        function showSuccess() {
-            document.getElementById('app').innerHTML = `
-                <div class="p-10 text-center fade-in">
-                    <h2 class="text-3xl font-black text-xigo mb-2 uppercase italic">¡MUCHAS GRACIAS!</h2>
-                    <p class="text-gray-600 mb-8 font-medium">Has completado la experiencia XIGO.</p>
-                    <div class="bg-xigo p-6 rounded-[2rem] text-white shadow-2xl mt-6">
-                        <p class="text-[10px] uppercase font-black tracking-[0.3em] mb-2 opacity-80">Cupón Vina María</p>
-                        <p class="text-4xl font-black mb-1">XIGO15</p>
-                        <p class="text-[10px] font-bold">15% DE DESCUENTO EN TU COMPRA</p>
-                    </div>
-                    <p class="text-[9px] text-gray-400 mt-6 uppercase font-bold tracking-widest leading-normal">Toma una captura de pantalla<br>para presentar este cupón.</p>
-                </div>`;
-        }
-        window.onload = renderQuestion;
-    </script>
-</body>
-</html>
+  );
+}
