@@ -2,27 +2,38 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>XIGO - Encuesta</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDK Compat (Versión estable para móviles y Mac antiguos) -->
+    
+    <!-- Firebase SDK Compat (Versión estable) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-        .header-bg { background-color: #2D5A27; height: 160px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .header-img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
-        .option-btn.selected { border-color: #2D5A27; background-color: #f0fdf4; color: #2D5A27; }
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Estilos críticos integrados para evitar pantalla en blanco */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f9fafb;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .header-bg { background-color: #2D5A27; height: 160px; display: flex; align-items: center; justify-content: center; }
+        .header-img { width: 100%; height: 100%; object-fit: cover; }
         .hide { display: none !important; }
-        #error-display { color: #dc2626; padding: 20px; text-align: center; font-size: 14px; }
+        .option-btn.selected { border-color: #2D5A27; background-color: #f0fdf4; color: #2D5A27; }
+        #app-container { opacity: 0; transition: opacity 0.3s ease-in; }
+        #app-container.visible { opacity: 1; }
     </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen sm:p-4">
+<body>
 
     <div id="app-container" class="bg-white w-full h-full sm:max-w-md sm:h-[800px] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-gray-100">
         <!-- Header -->
@@ -30,24 +41,31 @@
             <img src="https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png" class="header-img" alt="XIGO">
         </div>
 
-        <!-- Progress Bar -->
+        <!-- Barra de Progreso -->
         <div id="progress-container" class="px-8 pt-6">
             <div class="w-full bg-gray-100 h-1.5 rounded-full">
                 <div id="progress-bar" class="bg-[#2D5A27] h-full rounded-full transition-all duration-500" style="width: 5%"></div>
             </div>
         </div>
 
-        <!-- Content Area -->
+        <!-- Contenido Principal -->
         <div id="main-content" class="flex-1 p-8 flex flex-col overflow-y-auto">
-            <div class="flex items-center justify-center h-full">
-                <p class="text-gray-400 font-medium animate-pulse">Cargando encuesta...</p>
+            <div class="flex flex-col items-center justify-center h-full text-center">
+                <div class="w-10 h-10 border-4 border-gray-200 border-t-[#2D5A27] rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-400 font-medium">Cargando experiencia XIGO...</p>
             </div>
         </div>
 
-        <!-- Error Area -->
-        <div id="error-display" class="hide"></div>
+        <!-- Área de Error -->
+        <div id="error-display" class="p-8 text-center hide">
+            <div class="bg-red-50 p-6 rounded-2xl border border-red-100">
+                <p class="text-red-600 font-bold mb-2">Error de Conexión</p>
+                <p id="error-text" class="text-xs text-red-400 mb-4"></p>
+                <button onclick="location.reload()" class="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest">Reintentar</button>
+            </div>
+        </div>
 
-        <!-- Footer Action -->
+        <!-- Botón de Siguiente -->
         <div id="footer-action" class="p-8 hide">
             <button id="next-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">
                 Siguiente
@@ -56,7 +74,7 @@
     </div>
 
     <script>
-        // --- VARIABLES GLOBALES ---
+        // --- CONFIGURACIÓN Y DATOS ---
         const ADMIN_PASSWORD = "XIGO2026";
         const surveyData = [
             { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminate: "No, no me interesa" },
@@ -71,51 +89,58 @@
         let currentIdx = 0;
         let answers = {};
         let selectedInStep = [];
-        let adminClicks = 0;
         let db, auth, appId;
+        let retryCount = 0;
 
+        // --- REFERENCIAS ---
+        const appContainer = document.getElementById('app-container');
         const mainContent = document.getElementById('main-content');
         const progressBar = document.getElementById('progress-bar');
         const footerAction = document.getElementById('footer-action');
         const nextBtn = document.getElementById('next-btn');
         const errorDisplay = document.getElementById('error-display');
+        const errorText = document.getElementById('error-text');
 
-        // --- INICIALIZACIÓN SEGURA ---
-        window.addEventListener('DOMContentLoaded', () => {
-            initApp();
-        });
+        // --- LÓGICA DE INICIALIZACIÓN ---
+        function startLoading() {
+            appContainer.classList.add('visible');
+            checkFirebaseReady();
+        }
 
-        async function initApp() {
-            try {
-                // Verificar si la configuración existe
-                if (typeof __firebase_config === 'undefined') {
-                    throw new Error("Configuración de Firebase no disponible.");
-                }
-
-                const firebaseConfig = JSON.parse(__firebase_config);
-                firebase.initializeApp(firebaseConfig);
-                
-                db = firebase.firestore();
-                auth = firebase.auth();
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-universal';
-
-                // Autenticación anónima para permitir escritura en Firestore
-                await auth.signInAnonymously();
-                
-                // Si llegamos aquí, cargamos el primer paso
-                renderStep();
-            } catch (err) {
-                console.error("Error al iniciar:", err);
-                mainContent.innerHTML = "";
-                errorDisplay.classList.remove('hide');
-                errorDisplay.innerHTML = `
-                    <p class="font-bold">Error de conexión</p>
-                    <p class="text-xs mt-2">${err.message}</p>
-                    <button onclick="location.reload()" class="mt-4 text-xs underline uppercase font-black">Reintentar</button>
-                `;
+        function checkFirebaseReady() {
+            if (typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined') {
+                initApp();
+            } else if (retryCount < 10) {
+                retryCount++;
+                setTimeout(checkFirebaseReady, 500);
+            } else {
+                showCriticalError("No se pudieron cargar las librerías necesarias. Revisa tu conexión.");
             }
         }
 
+        async function initApp() {
+            try {
+                const config = JSON.parse(__firebase_config);
+                firebase.initializeApp(config);
+                
+                db = firebase.firestore();
+                auth = firebase.auth();
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-app';
+
+                await auth.signInAnonymously();
+                renderStep();
+            } catch (err) {
+                showCriticalError(err.message);
+            }
+        }
+
+        function showCriticalError(msg) {
+            mainContent.classList.add('hide');
+            errorDisplay.classList.remove('hide');
+            errorText.innerText = msg;
+        }
+
+        // --- NAVEGACIÓN ---
         function renderStep() {
             if (currentIdx >= surveyData.length) {
                 renderEmailStep();
@@ -125,26 +150,24 @@
             const q = surveyData[currentIdx];
             selectedInStep = [];
             footerAction.classList.add('hide');
-            
             progressBar.style.width = `${((currentIdx + 1) / surveyData.length) * 100}%`;
 
-            let html = `
-                <div class="fade-in">
+            mainContent.innerHTML = `
+                <div class="animate-in">
                     <p class="text-[#2D5A27] font-black text-[10px] uppercase tracking-widest mb-1 opacity-60">${q.section}</p>
                     <h2 class="text-xl font-black text-gray-800 leading-tight mb-6">${q.title}</h2>
-                    <div class="space-y-3" id="options-container">
+                    <div class="space-y-3">
                         ${q.options.map(o => `
-                            <button onclick="handleOptionClick('${o.replace(/'/g, "\\'")}')" class="option-btn w-full p-4 rounded-2xl text-left text-sm font-bold border-2 border-gray-100 text-gray-600 transition-all active:scale-[0.98]">
+                            <button onclick="handleSelection('${o.replace(/'/g, "\\'")}')" class="option-btn w-full p-4 rounded-2xl text-left text-sm font-bold border-2 border-gray-100 text-gray-600 transition-all active:scale-[0.98]">
                                 ${o}
                             </button>
                         `).join('')}
                     </div>
                 </div>
             `;
-            mainContent.innerHTML = html;
         }
 
-        window.handleOptionClick = (val) => {
+        window.handleSelection = (val) => {
             const q = surveyData[currentIdx];
             
             if (q.type === 'single') {
@@ -152,21 +175,21 @@
                     renderTerminated();
                     return;
                 }
+                answers[q.title] = val;
                 
+                // Efecto visual de selección
                 const btns = document.querySelectorAll('.option-btn');
                 btns.forEach(b => {
                     if (b.innerText.trim() === val) b.classList.add('selected');
                     else b.classList.remove('selected');
                 });
 
-                answers[q.title] = val;
                 setTimeout(() => {
                     currentIdx++;
                     renderStep();
-                }, 300);
+                }, 350);
             } else {
                 const btn = Array.from(document.querySelectorAll('.option-btn')).find(b => b.innerText.trim() === val);
-                
                 if (selectedInStep.includes(val)) {
                     selectedInStep = selectedInStep.filter(i => i !== val);
                     btn.classList.remove('selected');
@@ -175,7 +198,6 @@
                     selectedInStep.push(val);
                     btn.classList.add('selected');
                 }
-                
                 answers[q.title] = selectedInStep;
                 
                 if (selectedInStep.length > 0) footerAction.classList.remove('hide');
@@ -192,35 +214,28 @@
             progressBar.style.width = '100%';
             footerAction.classList.add('hide');
             mainContent.innerHTML = `
-                <div class="h-full flex flex-col justify-center items-center text-center fade-in">
-                    <h2 class="text-2xl font-black mb-2 tracking-tighter text-gray-800 uppercase">¡Casi terminamos!</h2>
-                    <p class="text-sm text-gray-500 mb-8 px-4 font-medium italic">Déjanos tu correo para recibir tu cupón y finalizar.</p>
-                    <input type="email" id="email-input" placeholder="tu@email.com" class="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-[#2D5A27] transition-colors" />
-                    <button onclick="submitFinal()" id="submit-btn" class="bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest w-full shadow-xl">
-                        FINALIZAR
-                    </button>
+                <div class="h-full flex flex-col justify-center items-center text-center">
+                    <h2 class="text-2xl font-black mb-2 text-gray-800 uppercase tracking-tighter">¡LISTO!</h2>
+                    <p class="text-xs text-gray-500 mb-8 font-medium">Déjanos tu email para enviarte el cupón de descuento.</p>
+                    <input type="email" id="email-input" placeholder="tu@email.com" class="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-[#2D5A27]" />
+                    <button onclick="saveFinalData()" id="save-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">FINALIZAR</button>
                 </div>
             `;
         }
 
-        window.submitFinal = async () => {
-            const emailInput = document.getElementById('email-input');
-            const email = emailInput.value;
-            if (!email.includes('@')) {
-                emailInput.classList.add('border-red-500');
-                return;
-            }
+        window.saveFinalData = async () => {
+            const email = document.getElementById('email-input').value;
+            if (!email || !email.includes('@')) return;
 
-            const btn = document.getElementById('submit-btn');
+            const btn = document.getElementById('save-btn');
             btn.disabled = true;
             btn.innerText = "ENVIANDO...";
 
             try {
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
-                    email: email,
-                    responses: answers,
-                    date: new Date().toLocaleString(),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    email,
+                    answers,
+                    date: new Date().toISOString()
                 });
                 renderSuccess();
             } catch (e) {
@@ -233,67 +248,50 @@
         function renderSuccess() {
             document.getElementById('progress-container').classList.add('hide');
             mainContent.innerHTML = `
-                <div class="h-full flex flex-col justify-center items-center text-center fade-in p-6">
-                    <div class="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 border-4 border-[#2D5A27] text-[#2D5A27] text-3xl font-bold">✓</div>
-                    <h2 class="text-2xl font-black text-[#2D5A27] mb-2">¡GRACIAS!</h2>
-                    <p class="text-gray-500 text-sm font-medium">Tus respuestas se guardaron. Pronto recibirás noticias nuestras.</p>
-                    <button onclick="location.reload()" class="mt-10 text-[10px] font-black text-gray-400 uppercase tracking-widest underline">Nueva encuesta</button>
+                <div class="h-full flex flex-col justify-center items-center text-center p-6">
+                    <div class="w-16 h-16 bg-green-50 text-[#2D5A27] rounded-full flex items-center justify-center mb-6 border-2 border-[#2D5A27] text-2xl">✓</div>
+                    <h2 class="text-2xl font-black text-[#2D5A27] mb-2 uppercase">¡GRACIAS!</h2>
+                    <p class="text-gray-500 text-sm">Tu cupón ha sido procesado.</p>
                 </div>
             `;
         }
 
         function renderTerminated() {
-            mainContent.innerHTML = `
-                <div class="h-full flex flex-col justify-center items-center text-center fade-in opacity-60">
-                    <h2 class="text-xl font-black mb-4 uppercase text-gray-800">Gracias por tu tiempo</h2>
-                    <p class="text-sm px-6 text-gray-500 font-medium italic">Esta encuesta está dirigida a compradores frecuentes de comida lista.</p>
-                    <button onclick="location.reload()" class="mt-6 text-[#2D5A27] font-black text-xs underline uppercase tracking-widest">Reintentar</button>
-                </div>
-            `;
+            mainContent.innerHTML = `<div class="text-center p-8 mt-20"><p class="text-gray-400 italic">Gracias por tu interés, pero buscamos un perfil distinto para esta encuesta.</p></div>`;
         }
 
         // --- MODO ADMIN ---
+        let adminClicks = 0;
         document.getElementById('admin-trigger').onclick = () => {
             adminClicks++;
             if (adminClicks >= 5) {
-                const p = prompt("Password:");
-                if (p === ADMIN_PASSWORD) renderAdmin();
+                if (prompt("Clave:") === ADMIN_PASSWORD) showAdminPanel();
                 adminClicks = 0;
             }
         };
 
-        async function renderAdmin() {
-            mainContent.innerHTML = `<p class="text-center p-10 font-bold text-gray-400 animate-pulse">Cargando base de datos...</p>`;
-            document.getElementById('progress-container').classList.add('hide');
-            
+        async function showAdminPanel() {
+            mainContent.innerHTML = `<p class="text-center py-20 text-xs uppercase tracking-widest text-gray-300">Consultando base de datos...</p>`;
             try {
                 const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').get();
-                let html = `<div class="fade-in"><h2 class="font-black text-xl mb-4 text-[#2D5A27]">REGISTROS (${snap.size})</h2>`;
-                
+                let html = `<h2 class="font-black text-xl mb-6">REPORTES (${snap.size})</h2>`;
                 snap.forEach(doc => {
                     const d = doc.data();
-                    html += `
-                        <div class="bg-gray-50 p-4 rounded-xl mb-3 border border-gray-100">
-                            <p class="text-xs font-black text-[#2D5A27] mb-1">${d.email}</p>
-                            <p class="text-[9px] text-gray-400 mb-2">${d.date}</p>
-                            <div class="text-[10px] space-y-1">
-                                ${Object.entries(d.responses || {}).map(([q, a]) => `
-                                    <div class="flex flex-col border-b border-gray-200 pb-1 mb-1">
-                                        <span class="font-bold text-gray-500 uppercase text-[8px]">${q}</span>
-                                        <span class="text-gray-800">${Array.isArray(a) ? a.join(', ') : a}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="bg-gray-50 p-4 rounded-xl mb-4 text-[10px]">
+                        <p class="font-bold text-[#2D5A27]">${d.email}</p>
+                        <p class="text-gray-400 mb-2">${d.date}</p>
+                        <hr class="mb-2 opacity-10">
+                        ${Object.entries(d.answers || {}).map(([q, a]) => `<b>${q}:</b> ${a}<br>`).join('')}
+                    </div>`;
                 });
-                
-                html += `<button onclick="location.reload()" class="w-full mt-4 p-4 text-xs font-black text-gray-400 uppercase tracking-widest border rounded-xl">Cerrar</button></div>`;
+                html += `<button onclick="location.reload()" class="w-full p-4 border rounded-xl text-xs font-bold text-gray-400">CERRAR</button>`;
                 mainContent.innerHTML = html;
-            } catch (e) {
-                alert("Error admin: " + e.message);
-            }
+                document.getElementById('progress-container').classList.add('hide');
+            } catch (e) { alert(e.message); }
         }
+
+        // Inicio forzado al cargar ventana
+        window.onload = startLoading;
     </script>
 </body>
 </html>
