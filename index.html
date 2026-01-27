@@ -3,310 +3,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>XIGO - Encuesta de Mercado</title>
-    
-    <!-- Scripts Base -->
+    <title>XIGO - Encuesta</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Firebase SDK Legacy/UMD (Más compatible con móviles) -->
+    <!-- Firebase App (v10) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        xigo: '#2D5A27',
-                        'xigo-light': '#f0fdf4',
-                    }
-                }
-            }
-        }
-    </script>
+    
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2D5A27; border-radius: 10px; }
-        .header-bg { background-color: #2D5A27; display: flex; align-items: center; justify-content: center; height: 160px; overflow: hidden; }
-        .header-img { width: 100%; height: 100%; object-fit: cover; }
-        input, button { font-family: inherit; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .header-bg { background-color: #2D5A27; height: 160px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .header-img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+        .option-btn.selected { border-color: #2D5A27; background-color: #f0fdf4; color: #2D5A27; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .hide { display: none; }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div id="root"></div>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen sm:p-4">
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+    <div id="app-container" class="bg-white w-full h-full sm:max-w-md sm:h-[800px] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-gray-100">
+        <!-- Header -->
+        <div class="header-bg flex-shrink-0" id="admin-trigger">
+            <img src="https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png" class="header-img" alt="XIGO">
+        </div>
 
-        // Configuración
-        const ADMIN_PASSWORD = "XIGO2026"; 
-        const LOGO_URL = "https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png"; 
+        <!-- Progress Bar -->
+        <div id="progress-container" class="px-8 pt-6">
+            <div class="w-full bg-gray-100 h-1.5 rounded-full">
+                <div id="progress-bar" class="bg-[#2D5A27] h-full rounded-full transition-all duration-500" style="width: 5%"></div>
+            </div>
+        </div>
 
-        // Inicializar Firebase (Versión Compat para máxima estabilidad en iPhone)
-        const firebaseConfig = JSON.parse(__firebase_config);
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-survey-v1';
+        <!-- Content -->
+        <div id="main-content" class="flex-1 p-8 flex flex-col overflow-y-auto">
+            <!-- Las preguntas se inyectan aquí -->
+        </div>
 
+        <!-- Footer Action (Para multi-selección) -->
+        <div id="footer-action" class="p-8 hide">
+            <button id="next-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">
+                Siguiente
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN Y DATOS ---
+        const ADMIN_PASSWORD = "XIGO2026";
         const surveyData = [
-            { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminateIf: "No, no me interesa" },
+            { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminate: "No, no me interesa" },
             { section: "Filtro", title: "¿Cuál describe mejor tu situación actual?", options: ["Trabajo fuera de casa", "Trabajo desde casa / Online", "Trabajo mixto", "Estudiante / No trabajo"], type: "single" },
-            { section: "Filtro", title: "¿Con qué frecuencia almuerzas fuera de casa en una semana laboral?", options: ["0 veces", "1 a 2 veces", "3 a 4 veces", "5 veces (todos los días)"], type: "single" },
-            { section: "Comida", title: "¿Has comprado alguna vez comida preparada para consumir después (Refrigerada o en tarrinas)?", options: ["Sí, regularmente", "Sí, algunas veces", "No, pero me llama la atención", "No, no me interesa"], type: "single" },
             { section: "Comida", title: "¿En qué situaciones elegirías comida lista durante un día laboral?", options: ["Poco tiempo", "Reuniones continuas", "No alcancé a cocinar", "Para comer en oficina", "Traslados", "Para llevar a casa"], type: "multiple" },
             { section: "Comida", title: "¿Qué tipo de comida te genera más confianza empacada? (Máx 3)", options: ["Tradicional ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas completas", "Sopas / Cremas", "Snacks salados"], type: "multiple", max: 3 },
-            { section: "Comida", title: "Para tu almuerzo o cena, ¿qué tamaño de porción prefieres?", options: ["Ligero", "Normal", "Grande", "Depende del día"], type: "single" },
-            { section: "Comida", title: "¿Qué esperas de un almuerzo para que 'valga la pena'? (Máx 3)", options: ["Porción generosa", "Saludable/Balanceado", "Mucha proteína", "Rápido y práctico", "Excelente sabor"], type: "multiple", max: 3 },
-            { section: "Comida", title: "¿Qué factor te haría dudar al comprar comida lista? (Máx 3)", options: ["Frescura", "Higiene", "Sabor", "Precio", "Tamaño porción", "Conservantes", "Caducidad", "Empaque"], type: "multiple", max: 3 },
-            { section: "Comida", title: "Si tuvieras acceso a comida fresca cerca, ¿con qué frecuencia la consumirías?", options: ["Nunca", "1 vez/semana", "2-3 veces/semana", "Casi todos los días"], type: "single" },
-            { section: "Comida", title: "¿Considerarías pedir comida lista por delivery si fuera de alta calidad?", options: ["Sí, con frecuencia", "Sí, ocasionalmente", "Tal vez", "No"], type: "single" },
             { section: "Precios", title: "¿Cuánto sueles pagar por tu almuerzo promedio entre semana?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
-            { section: "Precios", title: "¿Qué precio te parece razonable para un almuerzo fresco y balanceado?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
-            { section: "Precios", title: "¿A partir de qué precio considerarías que un almuerzo listo es demasiado CARO?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
-            { section: "Precios", title: "¿Qué formato de compra te resultaría más atractivo?", options: ["Pedido puntual", "Pack 2-3 días", "Pack semana laboral", "No me interesa"], type: "single" },
-            { section: "Precios", title: "Si tu almuerzo de $5.99 sube a $7.99 por costos, ¿qué harías?", options: ["Seguir comprando", "Menos frecuencia", "Buscar otra opción", "Dejar de comprar"], type: "single" },
             { section: "Bebidas", title: "¿Compras bebidas listas para tomar (agua, jugos, tés) en el trabajo?", options: ["Diario", "Varias veces/semana", "Ocasionalmente", "Rara vez", "Nunca"], type: "single" },
-            { section: "Bebidas", title: "¿Cuál opción te resultaría más atractiva? (Máx 2)", options: ["Agua natural/saborizada", "Jugo natural prensado", "Té frío/Infusión", "Café/Matcha", "Bebida funcional", "Refrescante"], type: "multiple", max: 2 },
-            { section: "Bebidas", title: "En café o smoothies, ¿qué tipo de leche prefieres? (Máx 2)", options: ["Entera", "Deslactosada", "Almendra", "Avena", "Soya", "Sin leche"], type: "multiple", max: 2 },
-            { section: "Bebidas", title: "¿Qué precio te parece razonable para una bebida RTD premium?", options: ["Hasta $1.99", "$2.00-$2.99", "$3.00-$3.99", "$4.00-$4.99", "+$5.00"], type: "single" },
-            { section: "Perfil", title: "¿En qué rango de edad te encuentras?", options: ["18-24", "25-34", "35-44", "45-54", "55+"], type: "single" },
-            { section: "Perfil", title: "¿Cuál es tu género?", options: ["Femenino", "Masculino", "Otro"], type: "single" },
-            { section: "Perfil", title: "¿En qué zona de Guayaquil realizas tus actividades?", options: ["Norte", "Centro", "Sur", "Samborondón/Vía Costa", "Durán"], type: "single" }
+            { section: "Perfil", title: "¿En qué rango de edad te encuentras?", options: ["18-24", "25-34", "35-44", "45-54", "55+"], type: "single" }
         ];
 
-        function App() {
-            const [step, setStep] = useState('survey');
-            const [currentIdx, setCurrentIdx] = useState(0);
-            const [answers, setAnswers] = useState({});
-            const [selectedInStep, setSelectedInStep] = useState([]);
-            const [email, setEmail] = useState("");
-            const [isLoading, setIsLoading] = useState(false);
-            const [adminClicks, setAdminClicks] = useState(0);
-            const [database, setDatabase] = useState([]);
-            const [selectedUser, setSelectedUser] = useState(null);
-            const [user, setUser] = useState(null);
-            const scrollRef = useRef(null);
+        let currentIdx = 0;
+        let answers = {};
+        let selectedInStep = [];
+        let adminClicks = 0;
 
-            useEffect(() => {
-                const login = async () => {
-                    try {
-                        let res;
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            res = await auth.signInWithCustomToken(__initial_auth_token);
-                        } else {
-                            res = await auth.signInAnonymously();
-                        }
-                        setUser(res.user);
-                    } catch (e) {
-                        console.error("Auth failed", e);
-                    }
-                };
-                login();
-            }, []);
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-universal';
 
-            useEffect(() => {
-                if (!user) return;
-                const path = `artifacts/${appId}/public/data/responses`;
-                const unsubscribe = db.collection(path).onSnapshot((snapshot) => {
-                    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setDatabase(docs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
-                }, (err) => console.error("Firestore error", err));
-                return () => unsubscribe();
-            }, [user]);
+        // Auth Silenciosa
+        auth.signInAnonymously().catch(e => console.error("Auth error", e));
 
-            useEffect(() => {
-                if (scrollRef.current) scrollRef.current.scrollTop = 0;
-            }, [currentIdx]);
+        // --- FUNCIONES CORE ---
+        const mainContent = document.getElementById('main-content');
+        const progressBar = document.getElementById('progress-bar');
+        const footerAction = document.getElementById('footer-action');
+        const nextBtn = document.getElementById('next-btn');
 
-            const handleAdminAccess = () => {
-                const clicks = adminClicks + 1;
-                if (clicks >= 5) {
-                    const p = prompt("Acceso Administrador:");
-                    if (p === ADMIN_PASSWORD) setStep('admin');
-                    setAdminClicks(0);
-                } else setAdminClicks(clicks);
-            };
-
-            const handleSelect = (val) => {
-                const q = surveyData[currentIdx];
-                if (q.type === 'single') {
-                    setAnswers(prev => ({...prev, [q.title]: { value: val, section: q.section }}));
-                    setSelectedInStep([val]);
-                    if (q.terminateIf && val === q.terminateIf) return setStep('terminated');
-                    
-                    setTimeout(() => {
-                        if (currentIdx < surveyData.length - 1) {
-                            setCurrentIdx(currentIdx + 1);
-                            setSelectedInStep([]);
-                        } else setStep('email');
-                    }, 250);
-                } else {
-                    let updated = selectedInStep.includes(val) 
-                        ? selectedInStep.filter(i => i !== val) 
-                        : (q.max && selectedInStep.length >= q.max ? selectedInStep : [...selectedInStep, val]);
-                    setSelectedInStep(updated);
-                    setAnswers(prev => ({...prev, [q.title]: { value: updated, section: q.section }}));
-                }
-            };
-
-            const submitSurvey = async () => {
-                if (!email.includes('@')) return alert("Por favor ingresa un email válido");
-                setIsLoading(true);
-                try {
-                    await db.collection(`artifacts/${appId}/public/data/responses`).add({
-                        email: email.trim(),
-                        date: new Date().toLocaleString('es-EC'),
-                        timestamp: new Date().toISOString(),
-                        responses: answers,
-                        userId: user ? user.uid : 'anon'
-                    });
-                    setStep('success');
-                } catch (e) {
-                    alert("Error al guardar: " + e.message);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
-            if (step === 'admin') {
-                return (
-                    <div className="min-h-screen bg-gray-100 p-4">
-                        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-4 h-[90vh]">
-                            <div className="bg-white w-full md:w-80 rounded-2xl shadow p-4 overflow-y-auto custom-scrollbar">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="font-black text-xigo">REGISTROS ({database.length})</h2>
-                                    <button onClick={() => setStep('survey')} className="text-xs bg-gray-200 px-2 py-1 rounded">Cerrar</button>
-                                </div>
-                                {database.map(u => (
-                                    <div key={u.id} onClick={() => setSelectedUser(u)} className={`p-3 rounded-xl mb-2 cursor-pointer border ${selectedUser?.id === u.id ? 'bg-xigo text-white' : 'hover:bg-gray-50'}`}>
-                                        <p className="text-xs font-bold truncate">{u.email}</p>
-                                        <p className="text-[10px] opacity-70">{u.date}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex-1 bg-white rounded-2xl shadow p-6 overflow-y-auto custom-scrollbar">
-                                {selectedUser ? (
-                                    <div className="fade-in">
-                                        <h3 className="text-xl font-black mb-4 border-b pb-2">{selectedUser.email}</h3>
-                                        {surveyData.map((q, i) => (
-                                            <div key={i} className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase">{q.section}</p>
-                                                <p className="text-xs font-bold mb-1">{q.title}</p>
-                                                <p className="text-sm text-xigo font-black">
-                                                    {selectedUser.responses?.[q.title] ? 
-                                                        (Array.isArray(selectedUser.responses[q.title].value) ? selectedUser.responses[q.title].value.join(" | ") : selectedUser.responses[q.title].value) 
-                                                        : "No respondió"}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : <div className="h-full flex items-center justify-center text-gray-300">Selecciona un usuario</div>}
-                            </div>
-                        </div>
-                    </div>
-                );
+        function renderStep() {
+            if (currentIdx >= surveyData.length) {
+                renderEmailStep();
+                return;
             }
 
-            return (
-                <div className="fixed inset-0 flex items-center justify-center bg-gray-50 sm:p-4">
-                    <div className="bg-white w-full h-full sm:max-w-md sm:h-[750px] sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border">
-                        <div onClick={handleAdminAccess} className="header-bg flex-shrink-0">
-                            <img src={LOGO_URL} className="header-img" alt="XIGO" />
-                        </div>
-                        
-                        <div className="flex-1 p-6 md:p-8 flex flex-col overflow-hidden relative">
-                            {step === 'survey' && (
-                                <div className="h-full flex flex-col fade-in">
-                                    <div className="w-full bg-gray-100 h-1 rounded-full mb-6">
-                                        <div className="bg-xigo h-full transition-all duration-500" style={{width: `${((currentIdx+1)/surveyData.length)*100}%`}}></div>
-                                    </div>
-                                    
-                                    <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar pr-1">
-                                        <p className="text-xigo font-black text-[10px] uppercase tracking-widest mb-1 opacity-60">{surveyData[currentIdx].section}</p>
-                                        <h2 className="text-xl font-black text-gray-800 leading-tight mb-6">{surveyData[currentIdx].title}</h2>
-                                        
-                                        <div className="space-y-3 mb-6">
-                                            {surveyData[currentIdx].options.map(o => (
-                                                <button 
-                                                    key={o} 
-                                                    onClick={() => handleSelect(o)} 
-                                                    className={`w-full p-4 rounded-2xl text-left text-sm font-bold border-2 transition-all active:scale-[0.98] ${selectedInStep.includes(o) ? 'border-xigo bg-xigo-light text-xigo' : 'border-gray-100 text-gray-600'}`}
-                                                >
-                                                    {o}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+            const q = surveyData[currentIdx];
+            selectedInStep = [];
+            footerAction.classList.add('hide');
+            
+            // Actualizar progreso
+            progressBar.style.width = `${((currentIdx + 1) / surveyData.length) * 100}%`;
 
-                                    {surveyData[currentIdx].type === 'multiple' && selectedInStep.length > 0 && (
-                                        <button 
-                                            onClick={() => {setCurrentIdx(currentIdx+1); setSelectedInStep([])}} 
-                                            className="w-full bg-xigo text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
-                                        >
-                                            Siguiente
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {step === 'email' && (
-                                <div className="h-full flex flex-col justify-center items-center text-center fade-in">
-                                    <h2 className="text-2xl font-black mb-2 tracking-tighter text-gray-800 uppercase">¡Casi terminamos!</h2>
-                                    <p className="text-sm text-gray-500 mb-8 px-4 font-medium italic">Déjanos tu correo para recibir tu cupón de Vina María y finalizar la encuesta.</p>
-                                    <input 
-                                        type="email" 
-                                        value={email} 
-                                        onChange={e => setEmail(e.target.value)} 
-                                        placeholder="tu@email.com" 
-                                        className="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-xigo transition-colors"
-                                    />
-                                    <button 
-                                        onClick={submitSurvey} 
-                                        disabled={isLoading} 
-                                        className="bg-xigo text-white py-4 rounded-2xl font-black uppercase tracking-widest w-full shadow-xl disabled:bg-gray-300"
-                                    >
-                                        {isLoading ? "ENVIANDO..." : "FINALIZAR"}
-                                    </button>
-                                </div>
-                            )}
-
-                            {step === 'success' && (
-                                <div className="h-full flex flex-col justify-center items-center text-center fade-in p-6">
-                                    <div className="w-20 h-20 bg-xigo-light rounded-full flex items-center justify-center mb-6 border-4 border-xigo">
-                                        <span className="text-3xl">✔</span>
-                                    </div>
-                                    <h2 className="text-2xl font-black text-xigo mb-2">¡ENCUESTA COMPLETADA!</h2>
-                                    <p className="text-gray-500 text-sm font-medium">Tus respuestas han sido procesadas correctamente en nuestra base de datos en la nube.</p>
-                                    <p className="text-xigo font-black mt-6 text-sm">¡Pronto recibirás tu cupón!</p>
-                                    <button onClick={() => window.location.reload()} className="mt-10 text-[10px] font-black text-gray-400 uppercase tracking-widest underline">Nueva encuesta</button>
-                                </div>
-                            )}
-
-                            {step === 'terminated' && (
-                                <div className="h-full flex flex-col justify-center items-center text-center fade-in opacity-60">
-                                    <h2 className="text-xl font-black mb-2 uppercase">Gracias</h2>
-                                    <p className="text-sm mb-8 px-6">Lamentamos que el servicio no sea de tu interés en este momento.</p>
-                                    <button onClick={() => window.location.reload()} className="text-xigo font-bold text-xs underline uppercase">Reiniciar</button>
-                                </div>
-                            )}
-                        </div>
+            let html = `
+                <div class="fade-in">
+                    <p class="text-[#2D5A27] font-black text-[10px] uppercase tracking-widest mb-1 opacity-60">${q.section}</p>
+                    <h2 class="text-xl font-black text-gray-800 leading-tight mb-6">${q.title}</h2>
+                    <div class="space-y-3" id="options-container">
+                        ${q.options.map(o => `
+                            <button onclick="handleOptionClick('${o.replace(/'/g, "\\'")}')" class="option-btn w-full p-4 rounded-2xl text-left text-sm font-bold border-2 border-gray-100 text-gray-600 transition-all active:scale-[0.98]">
+                                ${o}
+                            </button>
+                        `).join('')}
                     </div>
                 </div>
-            );
+            `;
+            mainContent.innerHTML = html;
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        window.handleOptionClick = (val) => {
+            const q = surveyData[currentIdx];
+            
+            if (q.type === 'single') {
+                if (q.terminate && val === q.terminate) {
+                    renderTerminated();
+                    return;
+                }
+                
+                // Efecto visual de selección
+                const btns = document.querySelectorAll('.option-btn');
+                btns.forEach(b => {
+                    if (b.innerText.trim() === val) b.classList.add('selected');
+                    else b.classList.remove('selected');
+                });
+
+                answers[q.title] = val;
+                setTimeout(() => {
+                    currentIdx++;
+                    renderStep();
+                }, 300);
+            } else {
+                // Lógica de selección múltiple
+                const btn = Array.from(document.querySelectorAll('.option-btn')).find(b => b.innerText.trim() === val);
+                
+                if (selectedInStep.includes(val)) {
+                    selectedInStep = selectedInStep.filter(i => i !== val);
+                    btn.classList.remove('selected');
+                } else {
+                    if (q.max && selectedInStep.length >= q.max) return;
+                    selectedInStep.push(val);
+                    btn.classList.add('selected');
+                }
+                
+                answers[q.title] = selectedInStep;
+                
+                if (selectedInStep.length > 0) footerAction.classList.remove('hide');
+                else footerAction.classList.add('hide');
+            }
+        };
+
+        nextBtn.onclick = () => {
+            currentIdx++;
+            renderStep();
+        };
+
+        function renderEmailStep() {
+            progressBar.style.width = '100%';
+            footerAction.classList.add('hide');
+            mainContent.innerHTML = `
+                <div class="h-full flex flex-col justify-center items-center text-center fade-in">
+                    <h2 class="text-2xl font-black mb-2 tracking-tighter text-gray-800 uppercase">¡Casi terminamos!</h2>
+                    <p class="text-sm text-gray-500 mb-8 px-4 font-medium italic">Déjanos tu correo para recibir tu cupón y finalizar.</p>
+                    <input type="email" id="email-input" placeholder="tu@email.com" class="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-[#2D5A27] transition-colors" />
+                    <button onclick="submitFinal()" id="submit-btn" class="bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest w-full shadow-xl">
+                        FINALIZAR
+                    </button>
+                </div>
+            `;
+        }
+
+        window.submitFinal = async () => {
+            const email = document.getElementById('email-input').value;
+            if (!email.includes('@')) {
+                alert("Email no válido");
+                return;
+            }
+
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = "ENVIANDO...";
+
+            try {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
+                    email: email,
+                    responses: answers,
+                    date: new Date().toLocaleString(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                renderSuccess();
+            } catch (e) {
+                alert("Error: " + e.message);
+                btn.disabled = false;
+                btn.innerText = "FINALIZAR";
+            }
+        };
+
+        function renderSuccess() {
+            document.getElementById('progress-container').classList.add('hide');
+            mainContent.innerHTML = `
+                <div class="h-full flex flex-col justify-center items-center text-center fade-in p-6">
+                    <div class="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 border-4 border-[#2D5A27] text-[#2D5A27] text-3xl font-bold">✓</div>
+                    <h2 class="text-2xl font-black text-[#2D5A27] mb-2">¡GRACIAS!</h2>
+                    <p class="text-gray-500 text-sm font-medium">Tus respuestas se guardaron. Pronto recibirás noticias nuestras.</p>
+                    <button onclick="location.reload()" class="mt-10 text-[10px] font-black text-gray-400 uppercase tracking-widest underline">Nueva encuesta</button>
+                </div>
+            `;
+        }
+
+        function renderTerminated() {
+            mainContent.innerHTML = `
+                <div class="h-full flex flex-col justify-center items-center text-center fade-in opacity-60">
+                    <h2 class="text-xl font-black mb-4 uppercase">Gracias por tu tiempo</h2>
+                    <p class="text-sm px-6">Esta encuesta está dirigida a compradores frecuentes de comida lista.</p>
+                    <button onclick="location.reload()" class="mt-6 text-[#2D5A27] font-bold text-xs underline">REINTENTAR</button>
+                </div>
+            `;
+        }
+
+        // --- MODO ADMIN ---
+        document.getElementById('admin-trigger').onclick = () => {
+            adminClicks++;
+            if (adminClicks >= 5) {
+                const p = prompt("Password:");
+                if (p === ADMIN_PASSWORD) renderAdmin();
+                adminClicks = 0;
+            }
+        };
+
+        async function renderAdmin() {
+            mainContent.innerHTML = `<p class="text-center p-10 font-bold text-gray-400">Cargando base de datos...</p>`;
+            document.getElementById('progress-container').classList.add('hide');
+            
+            try {
+                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').get();
+                let html = `<div class="fade-in"><h2 class="font-black text-xl mb-4 text-[#2D5A27]">REGISTROS (${snap.size})</h2>`;
+                
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    html += `
+                        <div class="bg-gray-50 p-4 rounded-xl mb-3 border border-gray-100">
+                            <p class="text-xs font-black text-[#2D5A27] mb-1">${d.email}</p>
+                            <p class="text-[9px] text-gray-400 mb-2">${d.date}</p>
+                            <div class="text-[10px] space-y-1">
+                                ${Object.entries(d.responses || {}).map(([q, a]) => `
+                                    <div class="flex flex-col border-b border-gray-200 pb-1 mb-1">
+                                        <span class="font-bold text-gray-500">${q}</span>
+                                        <span class="text-gray-800">${Array.isArray(a) ? a.join(', ') : a}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `<button onclick="location.reload()" class="w-full mt-4 p-4 text-xs font-black text-gray-400 uppercase tracking-widest border rounded-xl">Cerrar</button></div>`;
+                mainContent.innerHTML = html;
+            } catch (e) {
+                alert("Error admin: " + e.message);
+            }
+        }
+
+        // Inicio
+        renderStep();
     </script>
 </body>
 </html>
