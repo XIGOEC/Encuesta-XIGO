@@ -3,11 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XIGO - Encuesta de Mercado (23 Preguntas)</title>
+    <title>XIGO - Encuesta de Mercado Cloud</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js"
+      }
+    }
+    </script>
 
     <script>
         tailwind.config = {
@@ -33,19 +43,35 @@
 <body>
     <div id="root"></div>
 
+    <script type="module">
+        import { initializeApp } from "firebase/app";
+        import { getFirestore, collection, addDoc, onSnapshot, query } from "firebase/firestore";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
+
+        // Hacer Firebase disponible globalmente para el script de Babel
+        window.FB = { initializeApp, getFirestore, collection, addDoc, onSnapshot, query, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged };
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect } = React;
-
+        
+        // Configuración y constantes
         const ADMIN_PASSWORD = "XIGO2026"; 
         const LOGO_URL = "https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png"; 
 
+        // Inicializar Firebase usando el puente global
+        const { initializeApp, getFirestore, collection, addDoc, onSnapshot, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = window.FB;
+        
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-survey-v1';
+
         const surveyData = [
-            // SECCIÓN 0 - FILTRO
             { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminateIf: "No, no me interesa" },
             { section: "Filtro", title: "¿Cuál describe mejor tu situación actual?", options: ["Trabajo fuera de casa", "Trabajo desde casa / Online", "Trabajo mixto", "Estudiante / No trabajo"], type: "single" },
             { section: "Filtro", title: "¿Con qué frecuencia almuerzas fuera de casa en una semana laboral?", options: ["0 veces", "1 a 2 veces", "3 a 4 veces", "5 veces (todos los días)"], type: "single" },
-            
-            // SECCIÓN 1 - COMIDA
             { section: "Comida", title: "¿Has comprado alguna vez comida preparada para consumir después (Refrigerada o en tarrinas)?", options: ["Sí, regularmente", "Sí, algunas veces", "No, pero me llama la atención", "No, no me interesa"], type: "single" },
             { section: "Comida", title: "¿En qué situaciones elegirías comida lista durante un día laboral?", options: ["Poco tiempo", "Reuniones continuas", "No alcancé a cocinar", "Para comer en oficina", "Traslados", "Para llevar a casa"], type: "multiple" },
             { section: "Comida", title: "¿Qué tipo de comida te genera más confianza empacada? (Máx 3)", options: ["Tradicional ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas completas", "Sopas / Cremas", "Snacks salados"], type: "multiple", max: 3 },
@@ -54,21 +80,15 @@
             { section: "Comida", title: "¿Qué factor te haría dudar al comprar comida lista? (Máx 3)", options: ["Frescura", "Higiene", "Sabor", "Precio", "Tamaño porción", "Conservantes", "Caducidad", "Empaque"], type: "multiple", max: 3 },
             { section: "Comida", title: "Si tuvieras acceso a comida fresca cerca, ¿con qué frecuencia la consumirías?", options: ["Nunca", "1 vez/semana", "2-3 veces/semana", "Casi todos los días"], type: "single" },
             { section: "Comida", title: "¿Considerarías pedir comida lista por delivery si fuera de alta calidad?", options: ["Sí, con frecuencia", "Sí, ocasionalmente", "Tal vez", "No"], type: "single" },
-
-            // SECCIÓN 2 - PRECIOS
             { section: "Precios", title: "¿Cuánto sueles pagar por tu almuerzo promedio entre semana?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
             { section: "Precios", title: "¿Qué precio te parece razonable para un almuerzo fresco y balanceado?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
             { section: "Precios", title: "¿A partir de qué precio considerarías que un almuerzo listo es demasiado CARO?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
             { section: "Precios", title: "¿Qué formato de compra te resultaría más atractivo?", options: ["Pedido puntual", "Pack 2-3 días", "Pack semana laboral", "No me interesa"], type: "single" },
             { section: "Precios", title: "Si tu almuerzo de $5.99 sube a $7.99 por costos, ¿qué harías?", options: ["Seguir comprando", "Menos frecuencia", "Buscar otra opción", "Dejar de comprar"], type: "single" },
-
-            // SECCIÓN 3 - RTD
             { section: "Bebidas", title: "¿Compras bebidas listas para tomar (agua, jugos, tés) en el trabajo?", options: ["Diario", "Varias veces/semana", "Ocasionalmente", "Rara vez", "Nunca"], type: "single" },
             { section: "Bebidas", title: "¿Cuál opción te resultaría más atractiva? (Máx 2)", options: ["Agua natural/saborizada", "Jugo natural prensado", "Té frío/Infusión", "Café/Matcha", "Bebida funcional", "Refrescante"], type: "multiple", max: 2 },
             { section: "Bebidas", title: "En café o smoothies, ¿qué tipo de leche prefieres? (Máx 2)", options: ["Entera", "Deslactosada", "Almendra", "Avena", "Soya", "Sin leche"], type: "multiple", max: 2 },
             { section: "Bebidas", title: "¿Qué precio te parece razonable para una bebida RTD premium?", options: ["Hasta $1.99", "$2.00-$2.99", "$3.00-$3.99", "$4.00-$4.99", "+$5.00"], type: "single" },
-
-            // SECCIÓN 4 - PERFIL
             { section: "Perfil", title: "¿En qué rango de edad te encuentras?", options: ["18-24", "25-34", "35-44", "45-54", "55+"], type: "single" },
             { section: "Perfil", title: "¿Cuál es tu género?", options: ["Femenino", "Masculino", "Otro"], type: "single" },
             { section: "Perfil", title: "¿En qué zona de Guayaquil realizas tus actividades?", options: ["Norte", "Centro", "Sur", "Samborondón/Vía Costa", "Durán"], type: "single" }
@@ -84,6 +104,37 @@
             const [adminClicks, setAdminClicks] = useState(0);
             const [database, setDatabase] = useState([]);
             const [selectedUser, setSelectedUser] = useState(null);
+            const [user, setUser] = useState(null);
+
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) { console.error("Auth error", e); }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const responsesRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
+                const unsubscribe = onSnapshot(responsesRef, (snapshot) => {
+                    const docs = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    setDatabase(docs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+                }, (error) => {
+                    console.error("Error fetching data:", error);
+                });
+                return () => unsubscribe();
+            }, [user]);
 
             const handleAdminAccess = () => {
                 const clicks = adminClicks + 1;
@@ -96,28 +147,22 @@
 
             const downloadExcel = () => {
                 if (database.length === 0) return alert("No hay datos para descargar");
-                
-                // Definir las cabeceras (Preguntas)
+                const clean = (text) => !text ? "" : `"${String(text).replace(/"/g, '""')}"`;
                 const headers = ["ID", "Fecha", "Email", ...surveyData.map(q => q.title)];
-                
-                // Mapear cada registro a una fila
                 const rows = database.map(u => {
-                    const row = [u.id, u.date, u.email];
+                    const rowData = [u.id, u.date, u.email];
                     surveyData.forEach(q => {
-                        const ans = u.responses[q.title]?.value || "N/A";
-                        row.push(Array.isArray(ans) ? ans.join(" | ") : ans);
+                        const ans = u.responses?.[q.title]?.value || "Sin respuesta";
+                        rowData.push(Array.isArray(ans) ? ans.join(" | ") : ans);
                     });
-                    return row.join(",");
+                    return rowData.map(clean).join(";");
                 });
-
-                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-                const encodedUri = encodeURI(csvContent);
+                const csvContent = "\uFEFF" + [headers.map(clean).join(";"), ...rows].join("\r\n");
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `XIGO_Encuesta_${new Date().toLocaleDateString()}.csv`);
-                document.body.appendChild(link);
+                link.href = URL.createObjectURL(blob);
+                link.download = `XIGO_Data_Cloud_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
-                document.body.removeChild(link);
             };
 
             const handleSelect = (val) => {
@@ -141,63 +186,81 @@
                 }
             };
 
-            const submitSurvey = () => {
+            const submitSurvey = async () => {
                 if (!email.includes('@')) return alert("Email inválido");
+                if (!user) return alert("Error de conexión. Intenta de nuevo.");
+                
                 setIsLoading(true);
-                const record = { id: Date.now(), email, date: new Date().toLocaleString(), responses: answers };
-                setTimeout(() => {
-                    setDatabase(prev => [record, ...prev]);
+                try {
+                    const responsesRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
+                    await addDoc(responsesRef, {
+                        email,
+                        date: new Date().toLocaleString(),
+                        timestamp: new Date().toISOString(),
+                        responses: answers,
+                        userId: user.uid
+                    });
                     setIsLoading(false);
                     setStep('success');
-                }, 1000);
+                } catch (e) {
+                    setIsLoading(false);
+                    alert("Error al guardar en la nube: " + e.message);
+                }
             };
 
             if (step === 'admin') return (
                 <div className="min-h-screen bg-gray-50 p-4 font-sans overflow-y-auto">
                     <div className="max-w-6xl mx-auto">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-white p-6 rounded-3xl shadow-sm border gap-4">
-                            <h1 className="text-xl font-black text-xigo">XIGO ADMIN PANEL</h1>
+                            <div className="flex items-center gap-4">
+                                <img src={LOGO_URL} className="h-10 w-auto" alt="XIGO Logo" />
+                                <h1 className="text-xl font-black text-xigo">BASE DE DATOS EN LA NUBE</h1>
+                            </div>
                             <div className="flex gap-2">
                                 <button 
                                     onClick={downloadExcel}
-                                    className="bg-xigo text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-green-800 transition-colors"
+                                    className="bg-xigo text-white px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-800 transition-all shadow-md active:scale-95"
                                 >
-                                    📥 DESCARGAR EXCEL (CSV)
+                                    <span>📥</span> EXCEL ACTUALIZADO
                                 </button>
-                                <button onClick={() => setStep('survey')} className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold">Cerrar</button>
+                                <button onClick={() => setStep('survey')} className="bg-gray-100 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors">Salir</button>
                             </div>
                         </div>
+                        
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase ml-2 mb-2">Respuestas ({database.length})</p>
+                            <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar bg-white p-4 rounded-3xl border shadow-sm">
+                                <p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-2 tracking-widest">Registros en Nube ({database.length})</p>
                                 {database.map(u => (
-                                    <div key={u.id} onClick={() => setSelectedUser(u)} className={`p-4 rounded-2xl cursor-pointer border transition-all ${selectedUser?.id === u.id ? 'bg-xigo text-white border-xigo shadow-lg' : 'bg-white text-gray-700 hover:border-gray-300'}`}>
+                                    <div 
+                                        key={u.id} 
+                                        onClick={() => setSelectedUser(u)} 
+                                        className={`p-4 rounded-2xl cursor-pointer border transition-all ${selectedUser?.id === u.id ? 'bg-xigo text-white border-xigo shadow-lg scale-[1.02]' : 'bg-white text-gray-700 hover:border-xigo hover:text-xigo'}`}
+                                    >
                                         <p className="font-bold truncate text-sm">{u.email}</p>
-                                        <p className="text-[10px] uppercase opacity-70">{u.date}</p>
+                                        <p className={`text-[10px] uppercase ${selectedUser?.id === u.id ? 'text-green-100' : 'text-gray-400'}`}>{u.date}</p>
                                     </div>
                                 ))}
-                                {database.length === 0 && (
-                                    <div className="bg-white p-8 rounded-2xl border border-dashed text-center text-gray-400 text-sm">
-                                        No hay respuestas registradas aún.
-                                    </div>
-                                )}
                             </div>
-                            <div className="lg:col-span-2 bg-white rounded-3xl p-6 border min-h-[500px]">
+
+                            <div className="lg:col-span-2 bg-white rounded-3xl p-6 border shadow-sm min-h-[500px]">
                                 {selectedUser ? (
                                     <div className="fade-in">
-                                        <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                            <h3 className="text-lg font-black">{selectedUser.email}</h3>
-                                            <span className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded text-gray-500">{selectedUser.date}</span>
+                                        <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                            <div>
+                                                <h3 className="text-xl font-black text-gray-800">{selectedUser.email}</h3>
+                                                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">UID: {selectedUser.userId}</p>
+                                            </div>
+                                            <span className="text-[10px] font-black bg-xigo-light text-xigo px-3 py-1.5 rounded-full border border-green-100">{selectedUser.date}</span>
                                         </div>
-                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                             {surveyData.map((q, i) => {
-                                                const userAns = selectedUser.responses[q.title];
+                                                const userAns = selectedUser.responses?.[q.title];
                                                 return (
-                                                    <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                        <div className="flex justify-between mb-1">
-                                                            <p className="text-[9px] font-black text-gray-400 uppercase">{q.section}</p>
+                                                    <div key={i} className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="bg-white text-xigo text-[9px] font-black px-2 py-0.5 rounded border border-green-100 uppercase tracking-tighter">{q.section}</span>
                                                         </div>
-                                                        <p className="text-xs font-bold text-gray-600 mb-1">{q.title}</p>
+                                                        <p className="text-[11px] font-bold text-gray-500 mb-2 leading-tight">{q.title}</p>
                                                         <p className="text-sm font-black text-xigo">
                                                             {userAns ? (Array.isArray(userAns.value) ? userAns.value.join(", ") : userAns.value) : "Sin respuesta"}
                                                         </p>
@@ -206,10 +269,13 @@
                                             })}
                                         </div>
                                     </div>
-                                ) : <div className="h-full flex flex-col items-center justify-center text-gray-300 italic py-20">
-                                        <span className="text-4xl mb-2">📂</span>
-                                        <p>Selecciona un registro para ver el detalle</p>
-                                    </div>}
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-300 py-20 text-center">
+                                        <div className="bg-gray-50 p-6 rounded-full mb-4">☁️</div>
+                                        <p className="font-bold">Datos sincronizados con la nube</p>
+                                        <p className="text-xs mt-1">Selecciona un registro para ver el detalle completo</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -220,7 +286,7 @@
                 <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans">
                     <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[700px] border">
                         <div onClick={handleAdminAccess} className="header-bg flex-shrink-0 cursor-pointer">
-                            <img src={LOGO_URL} className="header-img" />
+                            <img src={LOGO_URL} className="header-img" alt="XIGO Header" />
                         </div>
                         <div className="p-8 flex-grow flex flex-col overflow-hidden">
                             {step === 'survey' && (
@@ -244,25 +310,27 @@
                             )}
                             {step === 'email' && (
                                 <div className="fade-in text-center flex flex-col justify-center h-full">
-                                    <h2 className="text-2xl font-black mb-4">¡LOGRADO!</h2>
-                                    <p className="text-sm text-gray-500 mb-8 font-medium">Completa tu correo para recibir el cupón de **Vina María**.</p>
+                                    <h2 className="text-2xl font-black mb-4 tracking-tighter">¡CASI LISTO!</h2>
+                                    <p className="text-sm text-gray-500 mb-8 font-medium">Completa tu correo para recibir el cupón de **Vina María** y guardar tus respuestas.</p>
                                     <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" className="p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-xigo"/>
-                                    <button onClick={submitSurvey} className="bg-xigo text-white py-4 rounded-2xl font-black uppercase tracking-widest w-full">Finalizar</button>
+                                    <button onClick={submitSurvey} disabled={isLoading} className="bg-xigo text-white py-4 rounded-2xl font-black uppercase tracking-widest w-full">
+                                        {isLoading ? "GUARDANDO EN NUBE..." : "FINALIZAR"}
+                                    </button>
                                 </div>
                             )}
                             {step === 'success' && (
                                 <div className="fade-in text-center flex flex-col justify-center h-full">
-                                    <div className="text-5xl mb-4 animate-bounce">🚀</div>
-                                    <h2 className="text-2xl font-black text-xigo">¡GRACIAS!</h2>
-                                    <p className="text-gray-500 text-sm mt-2">Tus respuestas valen oro para XIGO.</p>
-                                    <button onClick={() => window.location.reload()} className="mt-8 text-xigo font-bold text-xs underline">Volver al inicio</button>
+                                    <div className="text-5xl mb-4 animate-bounce">✅</div>
+                                    <h2 className="text-2xl font-black text-xigo">¡REGISTRADO!</h2>
+                                    <p className="text-gray-500 text-sm mt-2 font-medium">Tus respuestas se han guardado de forma permanente en la nube de XIGO.</p>
+                                    <button onClick={() => window.location.reload()} className="mt-8 text-xigo font-bold text-xs underline uppercase tracking-widest">Nueva encuesta</button>
                                 </div>
                             )}
                             {step === 'terminated' && (
-                                <div className="fade-in text-center flex flex-col justify-center h-full">
-                                    <h2 className="text-xl font-black mb-4 text-gray-400 uppercase">Gracias por tu tiempo</h2>
-                                    <p className="text-sm text-gray-400 mb-8">Esta encuesta está dirigida a consumidores actuales o potenciales de comida empacada.</p>
-                                    <button onClick={() => window.location.reload()} className="text-xigo font-bold text-xs underline">Reiniciar</button>
+                                <div className="fade-in text-center flex flex-col justify-center h-full text-gray-400">
+                                    <h2 className="text-xl font-black mb-4 uppercase">Gracias por tu interés</h2>
+                                    <p className="text-sm mb-8">Esta encuesta es para consumidores activos.</p>
+                                    <button onClick={() => window.location.reload()} className="text-xigo font-bold text-xs underline uppercase tracking-widest">Reiniciar</button>
                                 </div>
                             )}
                         </div>
