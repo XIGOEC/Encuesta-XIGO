@@ -5,20 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>XIGO - Encuesta</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase App (v10) -->
+    <!-- Firebase SDK Compat (Versión estable para móviles y Mac antiguos) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
         .header-bg { background-color: #2D5A27; height: 160px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .header-img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
         .option-btn.selected { border-color: #2D5A27; background-color: #f0fdf4; color: #2D5A27; }
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .hide { display: none; }
+        .hide { display: none !important; }
+        #error-display { color: #dc2626; padding: 20px; text-align: center; font-size: 14px; }
     </style>
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen sm:p-4">
@@ -36,12 +37,17 @@
             </div>
         </div>
 
-        <!-- Content -->
+        <!-- Content Area -->
         <div id="main-content" class="flex-1 p-8 flex flex-col overflow-y-auto">
-            <!-- Las preguntas se inyectan aquí -->
+            <div class="flex items-center justify-center h-full">
+                <p class="text-gray-400 font-medium animate-pulse">Cargando encuesta...</p>
+            </div>
         </div>
 
-        <!-- Footer Action (Para multi-selección) -->
+        <!-- Error Area -->
+        <div id="error-display" class="hide"></div>
+
+        <!-- Footer Action -->
         <div id="footer-action" class="p-8 hide">
             <button id="next-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">
                 Siguiente
@@ -50,7 +56,7 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN Y DATOS ---
+        // --- VARIABLES GLOBALES ---
         const ADMIN_PASSWORD = "XIGO2026";
         const surveyData = [
             { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminate: "No, no me interesa" },
@@ -66,22 +72,49 @@
         let answers = {};
         let selectedInStep = [];
         let adminClicks = 0;
+        let db, auth, appId;
 
-        // --- FIREBASE SETUP ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-universal';
-
-        // Auth Silenciosa
-        auth.signInAnonymously().catch(e => console.error("Auth error", e));
-
-        // --- FUNCIONES CORE ---
         const mainContent = document.getElementById('main-content');
         const progressBar = document.getElementById('progress-bar');
         const footerAction = document.getElementById('footer-action');
         const nextBtn = document.getElementById('next-btn');
+        const errorDisplay = document.getElementById('error-display');
+
+        // --- INICIALIZACIÓN SEGURA ---
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+
+        async function initApp() {
+            try {
+                // Verificar si la configuración existe
+                if (typeof __firebase_config === 'undefined') {
+                    throw new Error("Configuración de Firebase no disponible.");
+                }
+
+                const firebaseConfig = JSON.parse(__firebase_config);
+                firebase.initializeApp(firebaseConfig);
+                
+                db = firebase.firestore();
+                auth = firebase.auth();
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-universal';
+
+                // Autenticación anónima para permitir escritura en Firestore
+                await auth.signInAnonymously();
+                
+                // Si llegamos aquí, cargamos el primer paso
+                renderStep();
+            } catch (err) {
+                console.error("Error al iniciar:", err);
+                mainContent.innerHTML = "";
+                errorDisplay.classList.remove('hide');
+                errorDisplay.innerHTML = `
+                    <p class="font-bold">Error de conexión</p>
+                    <p class="text-xs mt-2">${err.message}</p>
+                    <button onclick="location.reload()" class="mt-4 text-xs underline uppercase font-black">Reintentar</button>
+                `;
+            }
+        }
 
         function renderStep() {
             if (currentIdx >= surveyData.length) {
@@ -93,7 +126,6 @@
             selectedInStep = [];
             footerAction.classList.add('hide');
             
-            // Actualizar progreso
             progressBar.style.width = `${((currentIdx + 1) / surveyData.length) * 100}%`;
 
             let html = `
@@ -121,7 +153,6 @@
                     return;
                 }
                 
-                // Efecto visual de selección
                 const btns = document.querySelectorAll('.option-btn');
                 btns.forEach(b => {
                     if (b.innerText.trim() === val) b.classList.add('selected');
@@ -134,7 +165,6 @@
                     renderStep();
                 }, 300);
             } else {
-                // Lógica de selección múltiple
                 const btn = Array.from(document.querySelectorAll('.option-btn')).find(b => b.innerText.trim() === val);
                 
                 if (selectedInStep.includes(val)) {
@@ -174,9 +204,10 @@
         }
 
         window.submitFinal = async () => {
-            const email = document.getElementById('email-input').value;
+            const emailInput = document.getElementById('email-input');
+            const email = emailInput.value;
             if (!email.includes('@')) {
-                alert("Email no válido");
+                emailInput.classList.add('border-red-500');
                 return;
             }
 
@@ -193,7 +224,7 @@
                 });
                 renderSuccess();
             } catch (e) {
-                alert("Error: " + e.message);
+                alert("Error al guardar: " + e.message);
                 btn.disabled = false;
                 btn.innerText = "FINALIZAR";
             }
@@ -214,9 +245,9 @@
         function renderTerminated() {
             mainContent.innerHTML = `
                 <div class="h-full flex flex-col justify-center items-center text-center fade-in opacity-60">
-                    <h2 class="text-xl font-black mb-4 uppercase">Gracias por tu tiempo</h2>
-                    <p class="text-sm px-6">Esta encuesta está dirigida a compradores frecuentes de comida lista.</p>
-                    <button onclick="location.reload()" class="mt-6 text-[#2D5A27] font-bold text-xs underline">REINTENTAR</button>
+                    <h2 class="text-xl font-black mb-4 uppercase text-gray-800">Gracias por tu tiempo</h2>
+                    <p class="text-sm px-6 text-gray-500 font-medium italic">Esta encuesta está dirigida a compradores frecuentes de comida lista.</p>
+                    <button onclick="location.reload()" class="mt-6 text-[#2D5A27] font-black text-xs underline uppercase tracking-widest">Reintentar</button>
                 </div>
             `;
         }
@@ -232,7 +263,7 @@
         };
 
         async function renderAdmin() {
-            mainContent.innerHTML = `<p class="text-center p-10 font-bold text-gray-400">Cargando base de datos...</p>`;
+            mainContent.innerHTML = `<p class="text-center p-10 font-bold text-gray-400 animate-pulse">Cargando base de datos...</p>`;
             document.getElementById('progress-container').classList.add('hide');
             
             try {
@@ -248,7 +279,7 @@
                             <div class="text-[10px] space-y-1">
                                 ${Object.entries(d.responses || {}).map(([q, a]) => `
                                     <div class="flex flex-col border-b border-gray-200 pb-1 mb-1">
-                                        <span class="font-bold text-gray-500">${q}</span>
+                                        <span class="font-bold text-gray-500 uppercase text-[8px]">${q}</span>
                                         <span class="text-gray-800">${Array.isArray(a) ? a.join(', ') : a}</span>
                                     </div>
                                 `).join('')}
@@ -263,9 +294,6 @@
                 alert("Error admin: " + e.message);
             }
         }
-
-        // Inicio
-        renderStep();
     </script>
 </body>
 </html>
