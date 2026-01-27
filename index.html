@@ -2,296 +2,260 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>XIGO - Encuesta</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase SDK Compat (Versión estable) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    
+    <!-- Fallback de estilos inmediatos -->
     <style>
-        /* Estilos críticos integrados para evitar pantalla en blanco */
+        :root { --primary: #2D5A27; --bg: #f3f4f6; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f9fafb;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
+            margin: 0; padding: 0; background: var(--bg); 
+            font-family: -apple-system, system-ui, sans-serif;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
         }
-        .header-bg { background-color: #2D5A27; height: 160px; display: flex; align-items: center; justify-content: center; }
-        .header-img { width: 100%; height: 100%; object-fit: cover; }
-        .hide { display: none !important; }
-        .option-btn.selected { border-color: #2D5A27; background-color: #f0fdf4; color: #2D5A27; }
-        #app-container { opacity: 0; transition: opacity 0.3s ease-in; }
-        #app-container.visible { opacity: 1; }
+        #app { 
+            background: white; width: 100%; max-width: 450px; height: 100vh; 
+            display: flex; flex-direction: column; overflow: hidden; position: relative;
+        }
+        @media (min-height: 700px) and (min-width: 500px) {
+            #app { height: 800px; border-radius: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        }
+        .header { background: var(--primary); height: 140px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .header img { width: 100%; height: 100%; object-fit: cover; }
+        .content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; }
+        .progress-container { padding: 20px 30px 0; background: white; }
+        .progress-bar { background: #e5e7eb; height: 6px; border-radius: 10px; overflow: hidden; }
+        .progress-fill { background: var(--primary); height: 100%; width: 0%; transition: width 0.4s ease; }
+        .question-title { font-size: 1.25rem; font-weight: 800; color: #1f2937; line-height: 1.2; margin-bottom: 25px; }
+        .option-btn { 
+            width: 100%; padding: 16px; margin-bottom: 12px; border: 2px solid #f3f4f6;
+            border-radius: 16px; text-align: left; font-weight: 700; color: #4b5563;
+            background: white; cursor: pointer; transition: all 0.2s; font-size: 14px;
+        }
+        .option-btn:active { transform: scale(0.98); }
+        .option-btn.selected { border-color: var(--primary); background: #f0fdf4; color: var(--primary); }
+        .footer { padding: 20px 30px 40px; background: white; }
+        .next-btn { 
+            width: 100%; background: var(--primary); color: white; border: none;
+            padding: 18px; border-radius: 16px; font-weight: 900; letter-spacing: 1px;
+            text-transform: uppercase; cursor: pointer; display: none;
+        }
+        .loading-screen { 
+            position: absolute; inset: 0; background: white; z-index: 50;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f4f6; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
     </style>
+
+    <!-- Firebase SDK (Solo si carga, si no, el app maneja el error) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 
-    <div id="app-container" class="bg-white w-full h-full sm:max-w-md sm:h-[800px] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-gray-100">
-        <!-- Header -->
-        <div class="header-bg flex-shrink-0" id="admin-trigger">
-            <img src="https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png" class="header-img" alt="XIGO">
+    <div id="app">
+        <!-- Pantalla de Carga -->
+        <div id="loader" class="loading-screen">
+            <div class="spinner"></div>
+            <p style="margin-top: 20px; color: #9ca3af; font-weight: 500; font-size: 14px;">Iniciando experiencia XIGO...</p>
         </div>
 
-        <!-- Barra de Progreso -->
-        <div id="progress-container" class="px-8 pt-6">
-            <div class="w-full bg-gray-100 h-1.5 rounded-full">
-                <div id="progress-bar" class="bg-[#2D5A27] h-full rounded-full transition-all duration-500" style="width: 5%"></div>
+        <!-- Cabecera -->
+        <div class="header">
+            <img src="https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png" alt="Logo XIGO">
+        </div>
+
+        <!-- Progreso -->
+        <div class="progress-container" id="prog-cont">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
             </div>
         </div>
 
-        <!-- Contenido Principal -->
-        <div id="main-content" class="flex-1 p-8 flex flex-col overflow-y-auto">
-            <div class="flex flex-col items-center justify-center h-full text-center">
-                <div class="w-10 h-10 border-4 border-gray-200 border-t-[#2D5A27] rounded-full animate-spin mb-4"></div>
-                <p class="text-gray-400 font-medium">Cargando experiencia XIGO...</p>
-            </div>
-        </div>
+        <!-- Contenido -->
+        <div class="content" id="main-content"></div>
 
-        <!-- Área de Error -->
-        <div id="error-display" class="p-8 text-center hide">
-            <div class="bg-red-50 p-6 rounded-2xl border border-red-100">
-                <p class="text-red-600 font-bold mb-2">Error de Conexión</p>
-                <p id="error-text" class="text-xs text-red-400 mb-4"></p>
-                <button onclick="location.reload()" class="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest">Reintentar</button>
-            </div>
-        </div>
-
-        <!-- Botón de Siguiente -->
-        <div id="footer-action" class="p-8 hide">
-            <button id="next-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">
-                Siguiente
-            </button>
+        <!-- Footer -->
+        <div class="footer">
+            <button id="next-btn" class="next-btn">Siguiente</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURACIÓN Y DATOS ---
-        const ADMIN_PASSWORD = "XIGO2026";
-        const surveyData = [
-            { section: "Filtro", title: "¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?", options: ["Sí, lo he comprado", "No, pero lo consideraría", "No, no me interesa"], type: "single", terminate: "No, no me interesa" },
-            { section: "Filtro", title: "¿Cuál describe mejor tu situación actual?", options: ["Trabajo fuera de casa", "Trabajo desde casa / Online", "Trabajo mixto", "Estudiante / No trabajo"], type: "single" },
-            { section: "Comida", title: "¿En qué situaciones elegirías comida lista durante un día laboral?", options: ["Poco tiempo", "Reuniones continuas", "No alcancé a cocinar", "Para comer en oficina", "Traslados", "Para llevar a casa"], type: "multiple" },
-            { section: "Comida", title: "¿Qué tipo de comida te genera más confianza empacada? (Máx 3)", options: ["Tradicional ecuatoriana", "Casera ligera", "Bowls balanceados", "Ensaladas completas", "Sopas / Cremas", "Snacks salados"], type: "multiple", max: 3 },
-            { section: "Precios", title: "¿Cuánto sueles pagar por tu almuerzo promedio entre semana?", options: ["Menos de $4.99", "$5.00 a $7.99", "$8.00 a $9.99", "$10.00 a $11.99", "$12.00 o más"], type: "single" },
-            { section: "Bebidas", title: "¿Compras bebidas listas para tomar (agua, jugos, tés) en el trabajo?", options: ["Diario", "Varias veces/semana", "Ocasionalmente", "Rara vez", "Nunca"], type: "single" },
-            { section: "Perfil", title: "¿En qué rango de edad te encuentras?", options: ["18-24", "25-34", "35-44", "45-54", "55+"], type: "single" }
+        // --- DATA DE LA ENCUESTA (BASADA EN TU PDF) ---
+        const survey = [
+            { id: 'f1', type: 'single', section: 'FILTRO', q: '¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?', options: ['Sí, lo he comprado', 'No, pero lo consideraría', 'No, no me interesa'], terminate: 'No, no me interesa' },
+            { id: 'f2', type: 'single', section: 'PERFIL', q: '¿Cuál describe mejor tu situación actual?', options: ['Trabajo fuera de casa', 'Trabajo desde casa/online', 'Trabajo mixto', 'Estudiante/No trabajo'] },
+            { id: 'f3', type: 'single', section: 'HÁBITOS', q: '¿Con qué frecuencia almuerzas fuera de casa en una semana?', options: ['0 veces', '1-2 veces', '3-4 veces', '5+ veces'] },
+            { id: 'c1', type: 'multi', section: 'COMIDA', q: '¿En qué situaciones considerarías consumir comida lista?', options: ['Poco tiempo', 'Reuniones continuas', 'No alcancé a cocinar', 'Comer en oficina', 'Traslados/Viajes', 'Llevar a casa'], max: 6 },
+            { id: 'c2', type: 'multi', section: 'COMIDA', q: '¿Qué tipo de comida te genera más confianza empacada? (Máx 3)', options: ['Ecuatoriana tradicional', 'Casera ligera', 'Bowls balanceados', 'Ensaladas completas', 'Sopas / Cremas', 'Snacks salados'], max: 3 },
+            { id: 'p1', type: 'single', section: 'PRECIOS', q: '¿Cuánto pagas hoy por tu almuerzo promedio?', options: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$10+'] },
+            { id: 'r1', type: 'multi', section: 'BEBIDAS', q: '¿Qué bebidas te resultan más atractivas? (Máx 2)', options: ['Agua natural/saborizada', 'Jugo natural prensado', 'Té frío / Infusión', 'Café Latte / Matcha', 'Bebida funcional'], max: 2 },
+            { id: 'e1', type: 'single', section: 'PERFIL', q: '¿En qué zona realizas la mayoría de tus actividades?', options: ['Norte', 'Centro', 'Sur', 'Samborondón / Vía Costa', 'Durán'] }
         ];
 
-        let currentIdx = 0;
+        let currentStep = 0;
         let answers = {};
         let selectedInStep = [];
-        let db, auth, appId;
-        let retryCount = 0;
+        let db, appId;
 
-        // --- REFERENCIAS ---
-        const appContainer = document.getElementById('app-container');
-        const mainContent = document.getElementById('main-content');
-        const progressBar = document.getElementById('progress-bar');
-        const footerAction = document.getElementById('footer-action');
-        const nextBtn = document.getElementById('next-btn');
-        const errorDisplay = document.getElementById('error-display');
-        const errorText = document.getElementById('error-text');
-
-        // --- LÓGICA DE INICIALIZACIÓN ---
-        function startLoading() {
-            appContainer.classList.add('visible');
-            checkFirebaseReady();
-        }
-
-        function checkFirebaseReady() {
-            if (typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined') {
-                initApp();
-            } else if (retryCount < 10) {
-                retryCount++;
-                setTimeout(checkFirebaseReady, 500);
-            } else {
-                showCriticalError("No se pudieron cargar las librerías necesarias. Revisa tu conexión.");
-            }
-        }
-
-        async function initApp() {
+        // --- INICIALIZACIÓN ---
+        window.onload = async () => {
+            const loader = document.getElementById('loader');
+            
             try {
-                const config = JSON.parse(__firebase_config);
-                firebase.initializeApp(config);
-                
-                db = firebase.firestore();
-                auth = firebase.auth();
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-app';
-
-                await auth.signInAnonymously();
-                renderStep();
-            } catch (err) {
-                showCriticalError(err.message);
+                // Verificar Firebase
+                if (typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined') {
+                    const config = JSON.parse(__firebase_config);
+                    firebase.initializeApp(config);
+                    db = firebase.firestore();
+                    appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-survey-1';
+                    await firebase.auth().signInAnonymously();
+                }
+            } catch (e) {
+                console.warn("Firebase no disponible, usando modo offline temporal.");
             }
-        }
 
-        function showCriticalError(msg) {
-            mainContent.classList.add('hide');
-            errorDisplay.classList.remove('hide');
-            errorText.innerText = msg;
-        }
+            loader.classList.add('hidden');
+            render();
+        };
 
-        // --- NAVEGACIÓN ---
-        function renderStep() {
-            if (currentIdx >= surveyData.length) {
-                renderEmailStep();
+        function render() {
+            const main = document.getElementById('main-content');
+            const nextBtn = document.getElementById('next-btn');
+            const progress = document.getElementById('progress-fill');
+            
+            if (currentStep >= survey.length) {
+                renderEmailCollector();
                 return;
             }
 
-            const q = surveyData[currentIdx];
+            const step = survey[currentStep];
             selectedInStep = [];
-            footerAction.classList.add('hide');
-            progressBar.style.width = `${((currentIdx + 1) / surveyData.length) * 100}%`;
+            nextBtn.style.display = 'none';
+            progress.style.width = `${(currentStep / survey.length) * 100}%`;
 
-            mainContent.innerHTML = `
-                <div class="animate-in">
-                    <p class="text-[#2D5A27] font-black text-[10px] uppercase tracking-widest mb-1 opacity-60">${q.section}</p>
-                    <h2 class="text-xl font-black text-gray-800 leading-tight mb-6">${q.title}</h2>
-                    <div class="space-y-3">
-                        ${q.options.map(o => `
-                            <button onclick="handleSelection('${o.replace(/'/g, "\\'")}')" class="option-btn w-full p-4 rounded-2xl text-left text-sm font-bold border-2 border-gray-100 text-gray-600 transition-all active:scale-[0.98]">
-                                ${o}
-                            </button>
-                        `).join('')}
-                    </div>
+            let optionsHtml = step.options.map(opt => `
+                <button class="option-btn" onclick="handleSelect('${opt.replace(/'/g, "\\'")}')">${opt}</button>
+            `).join('');
+
+            main.innerHTML = `
+                <div style="animation: fadeIn 0.4s ease">
+                    <p style="color: var(--primary); font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 5px;">${step.section}</p>
+                    <h2 class="question-title">${step.q}</h2>
+                    <div id="options-grid">${optionsHtml}</div>
                 </div>
             `;
         }
 
-        window.handleSelection = (val) => {
-            const q = surveyData[currentIdx];
+        window.handleSelect = (val) => {
+            const step = survey[currentStep];
+            const btns = document.querySelectorAll('.option-btn');
             
-            if (q.type === 'single') {
-                if (q.terminate && val === q.terminate) {
-                    renderTerminated();
+            if (step.type === 'single') {
+                if (step.terminate && val === step.terminate) {
+                    renderTermination();
                     return;
                 }
-                answers[q.title] = val;
                 
-                // Efecto visual de selección
-                const btns = document.querySelectorAll('.option-btn');
+                answers[step.id] = val;
                 btns.forEach(b => {
-                    if (b.innerText.trim() === val) b.classList.add('selected');
-                    else b.classList.remove('selected');
+                    b.classList.toggle('selected', b.innerText === val);
                 });
 
                 setTimeout(() => {
-                    currentIdx++;
-                    renderStep();
-                }, 350);
+                    currentStep++;
+                    render();
+                }, 300);
             } else {
-                const btn = Array.from(document.querySelectorAll('.option-btn')).find(b => b.innerText.trim() === val);
                 if (selectedInStep.includes(val)) {
-                    selectedInStep = selectedInStep.filter(i => i !== val);
-                    btn.classList.remove('selected');
+                    selectedInStep = selectedInStep.filter(v => v !== val);
                 } else {
-                    if (q.max && selectedInStep.length >= q.max) return;
+                    if (step.max && selectedInStep.length >= step.max) return;
                     selectedInStep.push(val);
-                    btn.classList.add('selected');
                 }
-                answers[q.title] = selectedInStep;
                 
-                if (selectedInStep.length > 0) footerAction.classList.remove('hide');
-                else footerAction.classList.add('hide');
+                answers[step.id] = selectedInStep;
+                btns.forEach(b => {
+                    b.classList.toggle('selected', selectedInStep.includes(b.innerText));
+                });
+
+                document.getElementById('next-btn').style.display = selectedInStep.length > 0 ? 'block' : 'none';
             }
         };
 
-        nextBtn.onclick = () => {
-            currentIdx++;
-            renderStep();
+        document.getElementById('next-btn').onclick = () => {
+            currentStep++;
+            render();
         };
 
-        function renderEmailStep() {
-            progressBar.style.width = '100%';
-            footerAction.classList.add('hide');
-            mainContent.innerHTML = `
-                <div class="h-full flex flex-col justify-center items-center text-center">
-                    <h2 class="text-2xl font-black mb-2 text-gray-800 uppercase tracking-tighter">¡LISTO!</h2>
-                    <p class="text-xs text-gray-500 mb-8 font-medium">Déjanos tu email para enviarte el cupón de descuento.</p>
-                    <input type="email" id="email-input" placeholder="tu@email.com" class="w-full p-4 border-2 rounded-2xl mb-4 text-center font-bold outline-none focus:border-[#2D5A27]" />
-                    <button onclick="saveFinalData()" id="save-btn" class="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">FINALIZAR</button>
+        function renderEmailCollector() {
+            document.getElementById('prog-cont').classList.add('hidden');
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('main-content').innerHTML = `
+                <div style="text-align: center; padding-top: 40px;">
+                    <h2 class="question-title">¡HAS TERMINADO!</h2>
+                    <p style="color: #6b7280; font-size: 14px; margin-bottom: 30px;">Ingresa tu correo para recibir tu cupón de descuento.</p>
+                    <input type="email" id="email" placeholder="correo@ejemplo.com" 
+                        style="width: 100%; padding: 18px; border: 2px solid #e5e7eb; border-radius: 16px; margin-bottom: 20px; font-size: 16px; text-align: center; box-sizing: border-box;">
+                    <button onclick="finish()" id="finish-btn" 
+                        style="width: 100%; background: var(--primary); color: white; border: none; padding: 18px; border-radius: 16px; font-weight: 900; cursor: pointer;">
+                        OBTENER CUPÓN
+                    </button>
                 </div>
             `;
         }
 
-        window.saveFinalData = async () => {
-            const email = document.getElementById('email-input').value;
-            if (!email || !email.includes('@')) return;
+        async function finish() {
+            const email = document.getElementById('email').value;
+            if (!email.includes('@')) {
+                alert("Por favor ingresa un email válido");
+                return;
+            }
 
-            const btn = document.getElementById('save-btn');
+            const btn = document.getElementById('finish-btn');
             btn.disabled = true;
-            btn.innerText = "ENVIANDO...";
+            btn.innerText = "PROCESANDO...";
 
             try {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
-                    email,
-                    answers,
-                    date: new Date().toISOString()
-                });
-                renderSuccess();
+                if (db) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
+                        email,
+                        answers,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                document.getElementById('main-content').innerHTML = `
+                    <div style="text-align: center; padding-top: 60px;">
+                        <div style="font-size: 50px; margin-bottom: 20px;">🎉</div>
+                        <h2 class="question-title" style="color: var(--primary)">¡GRACIAS!</h2>
+                        <p style="color: #4b5563; font-weight: 600;">Tu cupón de 15% ha sido enviado a tu correo.</p>
+                        <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">Revisa tu bandeja de entrada o spam.</p>
+                    </div>
+                `;
             } catch (e) {
                 alert("Error al guardar: " + e.message);
                 btn.disabled = false;
-                btn.innerText = "FINALIZAR";
+                btn.innerText = "OBTENER CUPÓN";
             }
-        };
+        }
 
-        function renderSuccess() {
-            document.getElementById('progress-container').classList.add('hide');
-            mainContent.innerHTML = `
-                <div class="h-full flex flex-col justify-center items-center text-center p-6">
-                    <div class="w-16 h-16 bg-green-50 text-[#2D5A27] rounded-full flex items-center justify-center mb-6 border-2 border-[#2D5A27] text-2xl">✓</div>
-                    <h2 class="text-2xl font-black text-[#2D5A27] mb-2 uppercase">¡GRACIAS!</h2>
-                    <p class="text-gray-500 text-sm">Tu cupón ha sido procesado.</p>
+        function renderTermination() {
+            document.getElementById('prog-cont').classList.add('hidden');
+            document.getElementById('main-content').innerHTML = `
+                <div style="text-align: center; padding-top: 60px; color: #9ca3af;">
+                    <p>Gracias por tu tiempo. Por ahora buscamos otros perfiles de consumo.</p>
                 </div>
             `;
         }
-
-        function renderTerminated() {
-            mainContent.innerHTML = `<div class="text-center p-8 mt-20"><p class="text-gray-400 italic">Gracias por tu interés, pero buscamos un perfil distinto para esta encuesta.</p></div>`;
-        }
-
-        // --- MODO ADMIN ---
-        let adminClicks = 0;
-        document.getElementById('admin-trigger').onclick = () => {
-            adminClicks++;
-            if (adminClicks >= 5) {
-                if (prompt("Clave:") === ADMIN_PASSWORD) showAdminPanel();
-                adminClicks = 0;
-            }
-        };
-
-        async function showAdminPanel() {
-            mainContent.innerHTML = `<p class="text-center py-20 text-xs uppercase tracking-widest text-gray-300">Consultando base de datos...</p>`;
-            try {
-                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').get();
-                let html = `<h2 class="font-black text-xl mb-6">REPORTES (${snap.size})</h2>`;
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    html += `<div class="bg-gray-50 p-4 rounded-xl mb-4 text-[10px]">
-                        <p class="font-bold text-[#2D5A27]">${d.email}</p>
-                        <p class="text-gray-400 mb-2">${d.date}</p>
-                        <hr class="mb-2 opacity-10">
-                        ${Object.entries(d.answers || {}).map(([q, a]) => `<b>${q}:</b> ${a}<br>`).join('')}
-                    </div>`;
-                });
-                html += `<button onclick="location.reload()" class="w-full p-4 border rounded-xl text-xs font-bold text-gray-400">CERRAR</button>`;
-                mainContent.innerHTML = html;
-                document.getElementById('progress-container').classList.add('hide');
-            } catch (e) { alert(e.message); }
-        }
-
-        // Inicio forzado al cargar ventana
-        window.onload = startLoading;
     </script>
+
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </body>
 </html>
