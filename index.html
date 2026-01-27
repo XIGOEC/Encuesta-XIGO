@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>XIGO - Encuesta de Mercado</title>
-    
+    <title>XIGO - Encuesta Oficial</title>
     <style>
         :root { --primary: #2D5A27; --bg: #f8fafc; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -20,120 +19,100 @@
         @media (min-height: 600px) and (min-width: 500px) {
             #app { height: 850px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
         }
-        .header { background: var(--primary); height: 120px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .header img { height: 60px; filter: brightness(0) invert(1); }
+        
+        .header { 
+            background: #000; height: 180px; width: 100%; display: flex; 
+            align-items: center; justify-content: center; flex-shrink: 0;
+            overflow: hidden; border-bottom: 4px solid var(--primary); padding: 0;
+            cursor: pointer;
+        }
+        .header img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
         .progress-container { padding: 15px 25px 5px; background: white; }
         .progress-bar { background: #f1f5f9; height: 6px; border-radius: 10px; overflow: hidden; }
         .progress-fill { background: var(--primary); height: 100%; width: 0%; transition: width 0.4s ease; }
         .content { flex: 1; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; }
         .section-tag { font-size: 11px; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
-        .question-title { font-size: 1.2rem; font-weight: 800; color: var(--text); line-height: 1.3; margin-bottom: 20px; }
+        .question-title { font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1.3; margin-bottom: 20px; }
         .option-btn { 
             width: 100%; padding: 14px 18px; margin-bottom: 10px; border: 2px solid #f1f5f9;
             border-radius: 14px; text-align: left; font-weight: 600; color: #64748b;
             background: white; cursor: pointer; transition: all 0.2s; font-size: 14px;
         }
-        .option-btn:active { transform: scale(0.98); }
         .option-btn.selected { border-color: var(--primary); background: #f0fdf4; color: var(--primary); }
         .footer { padding: 15px 25px 30px; background: white; border-top: 1px solid #f1f5f9; }
         .next-btn { 
             width: 100%; background: var(--primary); color: white; border: none;
             padding: 18px; border-radius: 14px; font-weight: 800; font-size: 15px;
-            text-transform: uppercase; cursor: pointer; transition: opacity 0.3s;
+            text-transform: uppercase; cursor: pointer;
         }
-        .next-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .loading-screen { 
-            position: absolute; inset: 0; background: white; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .spinner { width: 35px; height: 35px; border: 4px solid #f1f5f9; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .next-btn:disabled { opacity: 0.5; }
+        .admin-view { font-size: 12px; color: #475569; }
+        .admin-card { background: #f8fafc; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
         .hidden { display: none !important; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
-
     <div id="app">
-        <div id="loader" class="loading-screen">
-            <div class="spinner"></div>
-            <p style="margin-top: 15px; color: #64748b; font-size: 13px;">Cargando encuesta XIGO...</p>
+        <div class="header" id="main-header">
+             <img id="logo-img" alt="XIGO LOGO" onerror="this.parentElement.innerHTML='<h1 style=\'color:white; font-weight:900;\'>XIGO</h1>'">
         </div>
-
-        <div class="header">
-             <img src="https://i.ibb.co/SD87TqHW/Black-Modern-Minimalist-Letter-A-Logo-1-1.png" alt="Logo XIGO">
-        </div>
-
         <div class="progress-container" id="prog-wrapper">
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
-            </div>
+            <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
             <p id="step-counter" style="font-size: 10px; color: #94a3b8; margin-top: 5px; text-align: right; font-weight: bold;"></p>
         </div>
-
-        <div class="content" id="main-content"></div>
-
+        <div class="content" id="main-content">
+            <div style="text-align: center; padding-top: 40px;">
+                <p>Cargando encuesta...</p>
+            </div>
+        </div>
         <div class="footer" id="footer-actions">
             <button id="next-btn" class="next-btn" style="display: none;">Continuar</button>
         </div>
     </div>
 
     <script>
+        // CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = JSON.parse(__firebase_config);
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-survey-v1';
+
+        // Logo Image Logic
+        const rawDriveUrl = "https://drive.google.com/file/d/1WmKpnJPnBgB3OyYqe-a-OgRODLuuPjTq/view?usp=sharing";
+        const fileId = rawDriveUrl.match(/\/d\/(.+?)\//)[1];
+        document.getElementById('logo-img').src = `https://lh3.googleusercontent.com/u/0/d/${fileId}=w1600-h1600-iv1`;
+
         const surveyData = [
-            // BLOQUE 0
-            { id: 'F1', section: 'FILTRO', type: 'single', q: '¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa o en tu trabajo/universidad?', options: ['Sí, lo he comprado', 'No, pero lo consideraría si fuera conveniente', 'No, no me interesa'], terminate: 'No, no me interesa' },
-            { id: 'F2', section: 'FILTRO', type: 'single', q: '¿Cuál describe mejor tu situación actual?', options: ['Trabajo fuera de casa', 'Trabajo desde casa/online', 'Trabajo mixto [Oficina + casa]', 'Estudiante/ No trabajo'] },
-            { id: 'F3', section: 'FILTRO', type: 'single', q: '¿Con qué frecuencia almuerzas fuera de casa en una semana?', options: ['0 veces', '1-2 veces', '3-4 veces', '5+ veces'] },
-            // BLOQUE 1
-            { id: 'C1', section: 'COMIDA', type: 'single', q: '¿Has comprado alguna vez comida preparada para consumir después (Refrigerada o en tarrinas empacadas)?', options: ['Sí, regularmente', 'Sí, algunas veces', 'No, pero me llama la atención', 'No, no me interesa'] },
-            { id: 'C2', section: 'COMIDA', type: 'multi', q: '¿En qué situaciones considerarías consumir comida lista durante un día laboral?', options: ['Con poco tiempo para salir almorzar', 'Reuniones o trabajo continuo', 'No alcancé a cocinarme', 'Para comer en la oficina', 'Entre reuniones o traslados', 'Para llevar a casa', 'No lo considero'], max: 7 },
-            { id: 'C3', section: 'COMIDA', type: 'multi', q: '¿Qué tipo de comida te genera más apetito y confianza si viene lista y empacada?', options: ['Comida tradicional ecuatoriana', 'Comida casera ligera (arroz, carne, pollo)', 'Bowls balanceados (sushi, proteína, pasta)', 'Ensaladas completas', 'Sopas / Cremas', 'Snacks salados', 'No confiaría en comida empacada'], max: 3 },
-            { id: 'C4', section: 'COMIDA', type: 'single', q: 'Para tu almuerzo/cena, ¿qué tamaño de porción prefieres normalmente?', options: ['Ligero (para no sentirse pesado)', 'Normal (me deja satisfecho)', 'Grande (me gusta quedar lleno)', 'Depende del día'] },
-            { id: 'C5', section: 'COMIDA', type: 'multi', q: '¿Qué esperas de un almuerzo para sentir que "valió la pena"?', options: ['Que me llene (porción)', 'Que sea saludable', 'Buena cantidad de proteína', 'Que sea rápido y práctico', 'Que tenga muy buen sabor'], max: 3 },
-            { id: 'C6', section: 'COMIDA', type: 'multi', q: '¿Qué factor te haría dudar?', options: ['Frescura', 'Higiene', 'Sabor', 'Precio', 'Tamaño de porción', 'Conservantes', 'Fecha de caducidad', 'Empaque sostenible'], max: 3 },
-            { id: 'C7', section: 'COMIDA', type: 'single', q: 'Si tuvieras acceso a comida lista, fresca y de calidad cerca de tu rutina, ¿con qué frecuencia la consumirías?', options: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Casi todos los días'] },
-            // BLOQUE 2
-            { id: 'DLY1', section: 'DELIVERY', type: 'single', q: '¿Considerarías pedir comida lista por delivery si fuera confiable, fresca y de calidad?', options: ['Sí, con frecuencia', 'Sí, ocasionalmente', 'Tal vez', 'No'] },
-            { id: 'DLY2', section: 'DELIVERY', type: 'single', q: '¿Qué formato de pedido por delivery te resulta más atractivo?', options: ['Pedir comida puntual cuando la necesito', 'Pedir comida para 2-3 días', 'Pedir comida para toda la semana laboral', 'Depende del momento', 'No pediría por delivery'] },
-            { id: 'DLY3', section: 'DELIVERY', type: 'single', q: 'Si este tipo de comida estuviera disponible por delivery, ¿con qué frecuencia la pedirías?', options: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Más de 3 veces por semana'] },
-            // BLOQUE 3
-            { id: 'P1', section: 'PRECIOS', type: 'single', q: '¿En promedio, cuánto sueles pagar hoy por tu almuerzo entre semana?', options: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más', 'No pago almuerzo'] },
-            { id: 'P2', section: 'PRECIOS', type: 'single', q: '¿Qué precio te parece razonable para un almuerzo listo, fresco y de excelente calidad?', options: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'] },
-            { id: 'P3', section: 'PRECIOS', type: 'single', q: '¿A partir de qué precio considerarías que este almuerzo ya es CARO?', options: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'] },
-            { id: 'P4', section: 'PRECIOS', type: 'single', q: 'Si un almuerzo que hoy compras a $5.99 pasara a costar $7.99. ¿Qué harías?', options: ['Lo seguiría comprando igual', 'Lo compraría con menos frecuencia', 'Buscaría otra opción', 'Dejaría de comprarlo'] },
-            // BLOQUE 4
-            { id: 'R1', section: 'RTD', type: 'single', q: 'Durante tu jornada laboral, ¿compras bebidas listas para tomar?', options: ['Sí, casi todos los días', 'Varias veces por semana', 'Ocasionalmente', 'Rara vez', 'Nunca'] },
-            { id: 'R2', section: 'RTD', type: 'multi', q: '¿Cuál de estas bebidas listas para llevar te resultaría más atractiva?', options: ['Agua natural/saborizada (baja azúcar)', 'Jugo natural prensado / fresco', 'Té frío o infusión natural', 'Café latte y Matcha', 'Bebida funcional (energía, proteína)', 'Bebida refrescante', 'No suelo comprar bebidas'], max: 2 },
-            { id: 'R3', section: 'RTD', type: 'multi', q: 'Cuando compras bebidas con leche, ¿cuál prefieres normalmente?', options: ['Leche regular (entera)', 'Leche deslactosada', 'Leche de almendra', 'Leche de avena', 'Leche de soya', 'No consumo bebidas con leche'], max: 2 },
-            { id: 'R4', section: 'RTD', type: 'single', q: '¿Qué precio te parece razonable para una bebida lista (RTD) de buena calidad?', options: ['Hasta $1.99', '$2.49 - $2.99', '$3.49 - $3.99', '$4.49 - $4.99', 'Más de $5.00'] },
-            // BLOQUE FINAL
-            { id: 'D1', section: 'PERFIL', type: 'single', q: '¿Cuál es tu rango de edad?', options: ['18-24', '25-34', '35-44', '45-54', '55+'] },
-            { id: 'D2', section: 'PERFIL', type: 'single', q: '¿En qué zona realizas la mayoría de tus actividades?', options: ['Norte', 'Centro', 'Sur', 'Samborondón / Vía a la Costa', 'Durán'] }
+            { id: 'F1', section: 'FILTRO', type: 'single', q: '¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa?', options: ['Sí, lo he comprado', 'No, pero lo consideraría', 'No, no me interesa'], terminate: 'No, no me interesa' },
+            { id: 'F2', section: 'FILTRO', type: 'single', q: '¿Cuál describe mejor tu situación actual?', options: ['Trabajo fuera de casa (Oficina/Local)', 'Trabajo desde casa / Online', 'Esquema Mixto', 'Estudiante / No trabajo'] },
+            { id: 'C4', section: 'COMIDA', type: 'multi', q: '¿Qué tipo de comida te genera más confianza si viene lista y empacada?', options: ['Comida tradicional ecuatoriana', 'Comida casera ligera', 'Bowls balanceados', 'Ensaladas completas', 'Sopas / Cremas', 'Snacks salados'], max: 3 },
+            { id: 'P2', section: 'PRECIOS', type: 'single', q: '¿Qué precio te parece "Justo" por un menú listo (RTE), fresco y de alta calidad?', options: ['Menos de $4.99', '$5.00 - $6.99', '$7.00 - $8.99', '$9.00 - $10.99', 'Más de $11.00'] },
+            { id: 'PER2', section: 'PERFIL', type: 'single', q: '¿En qué zona de Guayaquil realizas la mayoría de tus actividades?', options: ['Norte', 'Centro', 'Sur', 'Samborondón / Vía a la Costa', 'Vía Daule / Durán'] }
         ];
 
         let currentStep = 0;
         let answers = {};
         let selectedInStep = [];
-        let db, appId;
+        let user = null;
+        let adminClicks = 0;
 
-        window.onload = async () => {
-            const loader = document.getElementById('loader');
+        // INICIO DE SESIÓN Y CARGA
+        async function initApp() {
             try {
-                if (typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined') {
-                    const config = JSON.parse(__firebase_config);
-                    firebase.initializeApp(config);
-                    db = firebase.firestore();
-                    appId = typeof __app_id !== 'undefined' ? __app_id : 'xigo-encuesta-final';
-                    await firebase.auth().signInAnonymously();
-                }
-            } catch (e) { console.warn("Modo offline activado"); }
-            loader.classList.add('hidden');
-            render();
-        };
+                const cred = await auth.signInAnonymously();
+                user = cred.user;
+                render();
+            } catch (e) {
+                document.getElementById('main-content').innerHTML = "<p>Error de conexión. Revisa tu internet.</p>";
+            }
+        }
 
         function render() {
             const main = document.getElementById('main-content');
@@ -141,10 +120,7 @@
             const fill = document.getElementById('progress-fill');
             const counter = document.getElementById('step-counter');
             
-            if (currentStep >= surveyData.length) {
-                renderFinal();
-                return;
-            }
+            if (currentStep >= surveyData.length) { renderFinal(); return; }
 
             const step = surveyData[currentStep];
             selectedInStep = [];
@@ -152,8 +128,8 @@
             fill.style.width = `${(currentStep / surveyData.length) * 100}%`;
             counter.innerText = `Pregunta ${currentStep + 1} de ${surveyData.length}`;
 
-            let html = `
-                <div style="animation: fadeIn 0.5s ease">
+            main.innerHTML = `
+                <div style="animation: fadeIn 0.4s ease">
                     <div class="section-tag">${step.section}</div>
                     <h2 class="question-title">${step.q}</h2>
                     <div id="options-grid">
@@ -161,11 +137,8 @@
                             <button class="option-btn" onclick="handleSelect('${opt.replace(/'/g, "\\'")}')">${opt}</button>
                         `).join('')}
                     </div>
-                    ${step.type === 'multi' ? `<p style="font-size:11px; color:#94a3b8; margin-top:10px;">* Puedes elegir hasta ${step.max} opciones</p>` : ''}
                 </div>
             `;
-            main.innerHTML = html;
-            main.scrollTop = 0;
         }
 
         window.handleSelect = (val) => {
@@ -173,12 +146,10 @@
             const btns = document.querySelectorAll('.option-btn');
             
             if (step.type === 'single') {
-                if (step.terminate && val === step.terminate) {
-                    renderTermination(); return;
-                }
+                if (step.terminate && val === step.terminate) { renderTermination(); return; }
                 answers[step.id] = val;
                 btns.forEach(b => b.classList.toggle('selected', b.innerText === val));
-                setTimeout(() => { currentStep++; render(); }, 350);
+                setTimeout(() => { currentStep++; render(); }, 300);
             } else {
                 if (selectedInStep.includes(val)) {
                     selectedInStep = selectedInStep.filter(v => v !== val);
@@ -192,22 +163,18 @@
             }
         };
 
-        document.getElementById('next-btn').onclick = () => {
-            currentStep++;
-            render();
-        };
+        document.getElementById('next-btn').onclick = () => { currentStep++; render(); };
 
         function renderFinal() {
             document.getElementById('prog-wrapper').classList.add('hidden');
             document.getElementById('footer-actions').classList.add('hidden');
             document.getElementById('main-content').innerHTML = `
-                <div style="text-align: center; padding-top: 30px; animation: fadeIn 0.6s ease">
-                    <img src="https://cdn-icons-png.flaticon.com/512/5690/5690130.png" width="80" style="margin-bottom: 20px;">
+                <div style="text-align: center; padding-top: 20px; animation: fadeIn 0.6s ease">
                     <h2 class="question-title">¡ENCUESTA COMPLETADA!</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 25px;">Por tu participación, recibe un cupón del 15% para Vina María.</p>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 25px;">Ingresa tu correo para recibir tu cupón del 15%.</p>
                     <input type="email" id="user-email" placeholder="Tu correo electrónico" 
                         style="width: 100%; padding: 16px; border: 2px solid #e2e8f0; border-radius: 14px; margin-bottom: 20px; text-align: center; font-size: 16px;">
-                    <button onclick="saveAndFinish()" id="save-btn" class="next-btn" style="display: block;">RECLAMAR MI CUPÓN</button>
+                    <button onclick="saveAndFinish()" id="save-btn" class="next-btn">OBTENER MI CUPÓN</button>
                 </div>
             `;
         }
@@ -215,29 +182,33 @@
         async function saveAndFinish() {
             const email = document.getElementById('user-email').value;
             if (!email.includes('@')) { alert("Ingresa un correo válido"); return; }
-            
+            if (!user) return;
+
             const btn = document.getElementById('save-btn');
-            btn.disabled = true;
-            btn.innerText = "ENVIANDO...";
+            btn.disabled = true; btn.innerText = "GUARDANDO...";
 
             try {
-                if (db) {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
-                        email, answers, timestamp: new Date().toISOString()
-                    });
-                }
+                // GUARDADO EN FIRESTORE (Persistente)
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').add({
+                    email,
+                    answers,
+                    uid: user.uid,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
                 document.getElementById('main-content').innerHTML = `
-                    <div style="text-align: center; padding-top: 50px; animation: fadeIn 0.6s ease">
-                        <h1 style="font-size: 50px;">🍷</h1>
+                    <div style="text-align: center; padding-top: 40px; animation: fadeIn 0.6s ease">
+                        <div style="font-size: 60px; margin-bottom: 10px;">🍷</div>
                         <h2 class="question-title" style="color: var(--primary)">¡LISTO!</h2>
-                        <p style="color: #1e293b; font-weight: 700; font-size: 18px;">CÓDIGO: XIGO15</p>
-                        <p style="color: #64748b; font-size: 14px; margin-top: 15px;">Hemos enviado una copia a <b>${email}</b>. Úsalo en @vinamariaec</p>
+                        <p style="font-size: 14px; color: #64748b;">Tu código de descuento es:</p>
+                        <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin: 15px 0; font-weight: 800; font-size: 24px; color: var(--primary);">XIGO15</div>
+                        <p style="font-size: 12px; color: #94a3b8;">Presenta este código en @vinamariaec</p>
+                        <button onclick="location.reload()" style="margin-top:20px; background:none; border:none; color:var(--primary); font-weight:bold; cursor:pointer;">Reiniciar encuesta</button>
                     </div>
                 `;
             } catch (e) {
-                alert("Error de conexión. Inténtalo de nuevo.");
-                btn.disabled = false;
-                btn.innerText = "RECLAMAR MI CUPÓN";
+                alert("Error al guardar. Verifica tu conexión.");
+                btn.disabled = false; btn.innerText = "OBTENER MI CUPÓN";
             }
         }
 
@@ -245,11 +216,49 @@
             document.getElementById('prog-wrapper').classList.add('hidden');
             document.getElementById('footer-actions').classList.add('hidden');
             document.getElementById('main-content').innerHTML = `
-                <div style="text-align: center; padding-top: 80px; color: #94a3b8;">
-                    <p>Gracias por tu interés. Por ahora buscamos otros perfiles para este estudio.</p>
-                </div>
-            `;
+                <div style="text-align: center; padding-top: 100px; color: #94a3b8;">
+                    <p>Gracias por tu tiempo. Esta encuesta busca un perfil específico.</p>
+                    <button onclick="location.reload()" style="color:var(--primary); font-weight:bold; background:none; border:none; cursor:pointer;">Volver a intentar</button>
+                </div>`;
         }
+
+        // PANEL DE ADMINISTRADOR (Click 5 veces en el logo)
+        document.getElementById('main-header').onclick = () => {
+            adminClicks++;
+            if (adminClicks >= 5) {
+                const pass = prompt("Contraseña de Administrador:");
+                if (pass === "XIGO2026") showAdminPanel();
+                adminClicks = 0;
+            }
+        };
+
+        async function showAdminPanel() {
+            document.getElementById('prog-wrapper').classList.add('hidden');
+            document.getElementById('footer-actions').classList.add('hidden');
+            const main = document.getElementById('main-content');
+            main.innerHTML = "<h3>Panel Admin: Cargando datos...</h3>";
+
+            try {
+                const snapshot = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('responses').get();
+                let html = `<h3>Respuestas Recibidas (${snapshot.size})</h3><div class="admin-view">`;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    html += `
+                        <div class="admin-card">
+                            <strong>${data.email}</strong><br>
+                            <small>${new Date(data.timestamp?.seconds * 1000).toLocaleString()}</small><br>
+                            <pre style="font-size:10px; background:#eee; padding:5px; overflow:auto;">${JSON.stringify(data.answers, null, 2)}</pre>
+                        </div>
+                    `;
+                });
+                html += `</div><button onclick="location.reload()" class="next-btn">Cerrar Admin</button>`;
+                main.innerHTML = html;
+            } catch (e) {
+                main.innerHTML = "Error al cargar datos.";
+            }
+        }
+
+        initApp();
     </script>
 </body>
 </html>
