@@ -19,14 +19,20 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* DISEÑO DE LOGO EN TODA LA CABECERA */
+        /* DISEÑO DE CABECERA RECORTADA */
         .header-logo-container {
             width: 100%;
-            line-height: 0; /* Elimina espacio extra debajo de la imagen */
+            height: 120px; /* Altura reducida para que no sea tan larga */
+            overflow: hidden;
+            background-color: var(--xigo-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .header-logo-container img {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover; /* Recorta la imagen para llenar el contenedor sin deformarse */
             display: block;
         }
 
@@ -70,7 +76,7 @@
 <body>
 
 <div class="main-card">
-    <!-- Cabecera con logo completo -->
+    <!-- Cabecera recortada -->
     <div class="header-logo-container" id="admin-trigger">
         <img src="https://lh3.googleusercontent.com/u/0/d/1WmKpnJPnBgB3OyYqe-a-OgRODLuuPjTq=w1000" alt="XIGO Logo" onerror="this.src='https://placehold.co/800x300/2D5A27/FFFFFF?text=XIGO+BEBIENDO+Y+COMIENDO'">
     </div>
@@ -140,7 +146,6 @@
         const container = document.getElementById('content');
         const footer = document.getElementById('footer-actions');
         
-        // Actualizar UI
         document.getElementById('label-bloque').innerText = `Bloque: ${step.b}`;
         document.getElementById('label-paso').innerText = `${current + 1} / ${questions.length}`;
         document.getElementById('progress-fill').style.width = `${((current) / questions.length) * 100}%`;
@@ -246,7 +251,7 @@
         `;
     }
 
-    // ACCESO ADMIN: 5 clics en el logo
+    // ACCESO ADMIN
     document.getElementById('admin-trigger').onclick = () => {
         adminCounter++;
         if (adminCounter >= 5) {
@@ -257,13 +262,54 @@
 
     function showAdmin() {
         const db = JSON.parse(localStorage.getItem('xigo_results') || '[]');
-        let html = `<div class="p-4"><h2 class="font-bold mb-4">Admin: ${db.length} respuestas</h2>`;
-        html += `<button onclick="downloadCSV()" class="bg-blue-600 text-white p-2 rounded w-full mb-4">Bajar Excel (CSV)</button>`;
+        let html = `<div class="p-4 overflow-y-auto" style="max-height: 80vh;">
+            <h2 class="font-bold text-xl mb-4">Panel Admin (${db.length})</h2>
+            <div class="flex gap-2 mb-6">
+                <button onclick="downloadCSV()" class="flex-1 bg-blue-600 text-white p-3 rounded-lg text-xs font-bold uppercase">Excel (CSV)</button>
+                <button onclick="downloadReport()" class="flex-1 bg-green-700 text-white p-3 rounded-lg text-xs font-bold uppercase tracking-tight">Reporte Texto</button>
+            </div>
+            <div class="space-y-3">`;
+        
         db.reverse().forEach(r => {
-            html += `<div class="text-[9px] border-b py-2"><b>${r.email}</b> - ${r.date}</div>`;
+            html += `<div class="text-[10px] p-2 bg-gray-50 border rounded">
+                <p class="font-bold text-slate-800">${r.email}</p>
+                <p class="text-gray-400">${r.date}</p>
+            </div>`;
         });
-        html += `<button onclick="location.reload()" class="mt-4 w-full">Salir</button></div>`;
+
+        html += `</div><button onclick="location.reload()" class="mt-8 w-full p-4 text-gray-400 font-bold uppercase text-xs">Cerrar Panel</button></div>`;
         document.getElementById('content').innerHTML = html;
+    }
+
+    // NUEVA FUNCIÓN: Descargar Reporte de Texto Ordenado
+    window.downloadReport = () => {
+        const db = JSON.parse(localStorage.getItem('xigo_results') || '[]');
+        if(db.length === 0) return alert("No hay datos para descargar");
+
+        let report = "========================================\n";
+        report += "    REPORTE DE RESPUESTAS XIGO\n";
+        report += "========================================\n\n";
+
+        db.forEach((entry, index) => {
+            report += `USUARIO #${index + 1}\n`;
+            report += `Email: ${entry.email}\n`;
+            report += `Fecha: ${entry.date}\n`;
+            report += `----------------------------------------\n`;
+            
+            questions.forEach(q => {
+                const answer = entry.responses[q.id] || "Sin respuesta";
+                report += `[${q.id}] ${q.q}\n`;
+                report += `R: ${answer}\n\n`;
+            });
+            report += `========================================\n\n`;
+        });
+
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Reporte_XIGO_Detallado.txt';
+        a.click();
     }
 
     window.downloadCSV = () => {
@@ -274,7 +320,7 @@
             questions.forEach(q => row.push(`"${r.responses[q.id] || ''}"`));
             csv += row.join(",") + "\n";
         });
-        const blob = new Blob([csv], { type: 'text/csv' });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
