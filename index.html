@@ -3,347 +3,287 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>XIGO - Encuesta de Mercado</title>
+    <title>XIGO - Encuesta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --xigo: #2D5A27; --xigo-light: #f0fdf4; }
-        .text-xigo { color: var(--xigo); }
-        .bg-xigo { background-color: var(--xigo); }
-        .border-xigo { border-color: var(--xigo); }
+        :root { --xigo-green: #2D5A27; --xigo-bg: #f8fafc; }
+        body { background-color: var(--xigo-bg); font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; }
         
-        body { background-color: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        
-        .app-container { 
-            max-width: 500px; 
-            margin: 0 auto; 
-            min-height: 100vh; 
-            background: white; 
-            display: flex; 
-            flex-direction: column; 
-            box-shadow: 0 0 40px rgba(0,0,0,0.1);
+        .main-card {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* Cabecera con logo a pantalla completa */
-        .brand-header { 
+        /* DISEÑO DE LOGO EN TODA LA CABECERA */
+        .header-logo-container {
             width: 100%;
-            aspect-ratio: 16 / 6;
-            background-color: white;
-            position: relative;
-            overflow: hidden;
-            cursor: pointer;
+            line-height: 0; /* Elimina espacio extra debajo de la imagen */
         }
-        .brand-header img {
+        .header-logo-container img {
             width: 100%;
-            height: 100%;
-            object-fit: cover; /* Cubre todo el espacio horizontal */
+            height: auto;
+            display: block;
         }
 
         .option-btn {
             width: 100%;
             text-align: left;
-            padding: 1rem 1.25rem;
-            border: 2px solid #f1f5f9;
-            border-radius: 1rem;
-            font-weight: 600;
-            color: #475569;
-            transition: all 0.2s ease;
+            padding: 18px 20px;
+            margin-bottom: 12px;
+            border: 2px solid #edf2f7;
+            border-radius: 12px;
+            transition: all 0.2s;
+            font-weight: 500;
+            color: #4a5568;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 0.75rem;
         }
         .option-btn:active { transform: scale(0.98); }
         .option-selected {
-            border-color: var(--xigo);
-            background-color: var(--xigo-light);
-            color: var(--xigo);
+            border-color: var(--xigo-green);
+            background-color: #f0fdf4;
+            color: var(--xigo-green);
         }
 
-        .progress-dot {
-            height: 4px;
-            background: #e2e8f0;
-            flex: 1;
-            margin: 0 2px;
-            border-radius: 2px;
+        .progress-bar {
+            height: 6px;
+            background: #edf2f7;
+            width: 100%;
+            position: relative;
         }
-        .progress-dot.active { background: var(--xigo); }
+        .progress-fill {
+            height: 100%;
+            background: var(--xigo-green);
+            transition: width 0.3s ease;
+        }
 
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Custom scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <header class="brand-header" id="admin-trigger">
-        <img src="https://lh3.googleusercontent.com/u/0/d/1WmKpnJPnBgB3OyYqe-a-OgRODLuuPjTq=w1000" alt="XIGO Header" onerror="this.src='https://placehold.co/600x200/2D5A27/FFFFFF?text=XIGO+BEBIENDO+Y+COMIENDO'">
-    </header>
-
-    <!-- Barra de Progreso Superior -->
-    <div class="px-6 py-4 border-b border-gray-50">
-        <div class="flex justify-between items-center mb-2">
-            <span id="block-title" class="text-[10px] font-black text-xigo uppercase tracking-widest italic">Cargando...</span>
-            <span id="step-count" class="text-[10px] font-bold text-gray-300">0/23</span>
-        </div>
-        <div class="flex" id="progress-dots"></div>
+<div class="main-card">
+    <!-- Cabecera con logo completo -->
+    <div class="header-logo-container" id="admin-trigger">
+        <img src="https://lh3.googleusercontent.com/u/0/d/1WmKpnJPnBgB3OyYqe-a-OgRODLuuPjTq=w1000" alt="XIGO Logo" onerror="this.src='https://placehold.co/800x300/2D5A27/FFFFFF?text=XIGO+BEBIENDO+Y+COMIENDO'">
     </div>
 
-    <main id="survey-content" class="flex-1 px-6 py-8 overflow-y-auto custom-scroll">
-        <!-- Contenido dinámico -->
+    <!-- Progreso -->
+    <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+    </div>
+
+    <div class="px-6 py-4 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+        <span id="label-bloque">Cargando...</span>
+        <span id="label-paso">1 / 23</span>
+    </div>
+
+    <!-- Contenido -->
+    <main id="content" class="flex-1 px-6 py-4">
+        <!-- Preguntas dinámicas -->
     </main>
 
-    <footer id="survey-footer" class="p-6 border-t border-gray-50 hidden">
-        <button id="next-btn" onclick="handleNext()" class="w-full bg-xigo text-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg hover:opacity-90 transition-opacity">
-            Siguiente
+    <!-- Botón para selección múltiple -->
+    <footer id="footer-actions" class="p-6 hidden">
+        <button onclick="nextStep()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg">
+            Continuar
         </button>
     </footer>
 </div>
 
 <script>
-    // --- LISTADO DE 23 PREGUNTAS SEGÚN PDF ---
     const questions = [
-        // BLOQUE 0: FILTRO
-        { id: 'F1', block: 'Filtro', q: '¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa, trabajo o universidad?', opt: ['Sí, lo he comprado', 'No, pero lo consideraría si fuera conveniente', 'No, no me interesa'], type: 'single', exit: 'No, no me interesa' },
-        { id: 'F2', block: 'Filtro', q: '¿Cuál describe mejor tu situación actual?', opt: ['Trabajo fuera de casa', 'Trabajo desde casa/online', 'Trabajo mixto [Oficina + casa]', 'Estudiante / No trabajo'], type: 'single' },
-        { id: 'F3', block: 'Filtro', q: '¿Con qué frecuencia almuerzas fuera de casa en una semana?', opt: ['0 veces', '1-2 veces', '3-4 veces', '5+ veces'], type: 'single' },
+        { id: 'F1', b: 'Filtro', q: '¿En los últimos 30 días, has comprado comida preparada o empacada para consumir fuera de casa, trabajo o universidad?', o: ['Sí, lo he comprado', 'No, pero lo consideraría si fuera conveniente', 'No, no me interesa'], t: 'single', exit: 'No, no me interesa' },
+        { id: 'F2', b: 'Filtro', q: '¿Cuál describe mejor tu situación actual?', o: ['Trabajo fuera de casa', 'Trabajo desde casa/online', 'Trabajo mixto [Oficina + casa]', 'Estudiante / No trabajo'], t: 'single' },
+        { id: 'F3', b: 'Filtro', q: '¿Con qué frecuencia almuerzas fuera de casa en una semana?', o: ['0 veces', '1-2 veces', '3-4 veces', '5+ veces'], t: 'single' },
         
-        // BLOQUE 1: COMIDA
-        { id: 'C1', block: 'Comida', q: '¿Has comprado alguna vez comida preparada para consumir después (Refrigerada o en tarrinas)?', opt: ['Sí, regularmente', 'Sí, algunas veces', 'No, pero me llama la atención', 'No, no me interesa'], type: 'single' },
-        { id: 'C2', block: 'Comida', q: '¿En qué situaciones considerarías consumir comida lista durante un día laboral?', opt: ['Con poco tiempo para almorzar', 'Reuniones o trabajo continuo', 'No alcancé a cocinarme', 'Para comer en la oficina', 'Entre reuniones o traslados', 'Para llevar a casa', 'No lo considera'], type: 'multi', max: 7 },
-        { id: 'C3', block: 'Comida', q: '¿Qué tipo de comida te genera más apetito y confianza si viene empacada?', opt: ['Comida tradicional ecuatoriana', 'Comida casera ligera (arroz, carne, pollo)', 'Bowls balanceados (sushi, proteína, pasta)', 'Ensaladas completas', 'Sopas / Cremas', 'Snacks salados', 'No confiaría en comida empacada'], type: 'multi', max: 3 },
-        { id: 'C4', block: 'Comida', q: '¿Qué tamaño de porción prefieres normalmente para tu almuerzo/cena?', opt: ['Ligero (para no sentirse pesado)', 'Normal (me deja satisfecho)', 'Grande (me gusta quedar lleno)', 'Depende del día'], type: 'single' },
-        { id: 'C5', block: 'Comida', q: '¿Qué esperas de un almuerzo para sentir que "valió la pena"?', opt: ['Que me llene (porción)', 'Que sea saludable', 'Buena cantidad de proteína', 'Que sea rápido y práctico', 'Que tenga muy buen sabor'], type: 'multi', max: 3 },
-        { id: 'C6', block: 'Comida', q: '¿Qué factor te haría dudar al comprar?', opt: ['Frescura', 'Higiene', 'Sabor', 'Precio', 'Tamaño de la porción', 'Uso de conservantes', 'Fecha de caducidad', 'Empaque sostenible'], type: 'multi', max: 3 },
-        { id: 'C7', block: 'Comida', q: 'Si tuvieras acceso a comida fresca y de calidad en tu rutina, ¿con qué frecuencia la consumirías?', opt: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Casi todos los días'], type: 'single' },
+        { id: 'C1', b: 'Comida', q: '¿Has comprado alguna vez comida preparada para consumir después (Refrigerada o en tarrinas)?', o: ['Sí, regularmente', 'Sí, algunas veces', 'No, pero me llama la atención', 'No, no me interesa'], t: 'single' },
+        { id: 'C2', b: 'Comida', q: '¿En qué situaciones considerarías consumir comida lista durante un día laboral?', o: ['Con poco tiempo para almorzar', 'Reuniones o trabajo continuo', 'No alcancé a cocinarme', 'Para comer en la oficina', 'Entre reuniones o traslados', 'Para llevar a casa', 'No lo considera'], t: 'multi', m: 7 },
+        { id: 'C3', b: 'Comida', q: '¿Qué tipo de comida te genera más apetito y confianza si viene empacada?', o: ['Comida tradicional ecuatoriana', 'Comida casera ligera', 'Bowls balanceados (sushi, proteína)', 'Ensaladas completas', 'Sopas / Cremas', 'Snacks salados', 'No confiaría'], t: 'multi', m: 3 },
+        { id: 'C4', b: 'Comida', q: '¿Qué tamaño de porción prefieres normalmente para tu almuerzo/cena?', o: ['Ligero', 'Normal', 'Grande', 'Depende del día'], t: 'single' },
+        { id: 'C5', b: 'Comida', q: '¿Qué esperas de un almuerzo para sentir que "valió la pena"?', o: ['Que me llene', 'Que sea saludable', 'Buena cantidad de proteína', 'Rápido y práctico', 'Muy buen sabor'], t: 'multi', m: 3 },
+        { id: 'C6', b: 'Comida', q: '¿Qué factor te haría dudar al comprar?', o: ['Frescura', 'Higiene', 'Sabor', 'Precio', 'Tamaño', 'Conservantes', 'Caducidad', 'Empaque sostenible'], t: 'multi', m: 3 },
+        { id: 'C7', b: 'Comida', q: '¿Con qué frecuencia consumirías comida fresca de calidad cerca de tu rutina?', o: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Casi todos los días'], t: 'single' },
         
-        // BLOQUE 2: DELIVERY
-        { id: 'D1', block: 'Delivery', q: '¿Considerarías pedir comida lista por delivery si fuera confiable y fresca?', opt: ['Sí, con frecuencia', 'Sí, ocasionalmente', 'Tal vez', 'No'], type: 'single' },
-        { id: 'D2', block: 'Delivery', q: '¿Qué formato de pedido por delivery te resulta más atractivo?', opt: ['Pedir comida puntual del momento', 'Pedir comida para 2-3 días', 'Pedir comida para toda la semana', 'Depende del día', 'No pediría por delivery'], type: 'single' },
-        { id: 'D3', block: 'Delivery', q: '¿Con qué frecuencia crees que pedirías comida lista por delivery?', opt: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Más de 3 veces por semana'], type: 'single' },
+        { id: 'D1', b: 'Delivery', q: '¿Considerarías pedir comida lista por delivery si fuera confiable y fresca?', o: ['Sí, con frecuencia', 'Sí, ocasionalmente', 'Tal vez', 'No'], t: 'single' },
+        { id: 'D2', b: 'Delivery', q: '¿Qué formato de pedido por delivery te resulta más atractivo?', o: ['Comida puntual', 'Para 2-3 días', 'Para toda la semana', 'Depende del día', 'No pediría'], t: 'single' },
+        { id: 'D3', b: 'Delivery', q: '¿Con qué frecuencia pedirías comida lista por delivery?', o: ['Nunca', '1 vez por semana', '2-3 veces por semana', 'Más de 3 veces por semana'], t: 'single' },
         
-        // BLOQUE 3: PRECIOS
-        { id: 'P1', block: 'Precios', q: '¿En promedio, cuánto sueles pagar hoy por tu almuerzo entre semana?', opt: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más', 'No pago almuerzo'], type: 'single' },
-        { id: 'P2', block: 'Precios', q: '¿Qué precio te parece razonable para un almuerzo listo, fresco y de calidad nutricional?', opt: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'], type: 'single' },
-        { id: 'P3', block: 'Precios', q: '¿A partir de qué precio considerarías que este tipo de almuerzo ya es CARO?', opt: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'], type: 'single' },
-        { id: 'P4', block: 'Precios', q: 'Si un almuerzo que hoy compras a $5.99 subiera a $7.99 por mejora de ingredientes, ¿qué harías?', opt: ['Lo seguiría comprando igual', 'Lo compraría con menos frecuencia', 'Buscaría otra opción', 'Dejaría de comprarlo'], type: 'single' },
+        { id: 'P1', b: 'Precios', q: '¿Cuánto sueles pagar hoy por tu almuerzo entre semana?', o: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más', 'No pago almuerzo'], t: 'single' },
+        { id: 'P2', b: 'Precios', q: '¿Qué precio te parece razonable para un almuerzo de excelente calidad nutricional?', o: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'], t: 'single' },
+        { id: 'P3', b: 'Precios', q: '¿A partir de qué precio considerarías que un almuerzo ya es CARO?', o: ['Menos de $4.99', '$5.99 - $7.99', '$7.99 - $9.99', '$9.99 - $11.99', '$11.99 o más'], t: 'single' },
+        { id: 'P4', b: 'Precios', q: 'Si un almuerzo de $5.99 subiera a $7.99 por mejora de ingredientes, ¿qué harías?', o: ['Lo seguiría comprando igual', 'Compraría con menos frecuencia', 'Buscaría otra opción', 'Dejaría de comprarlo'], t: 'single' },
         
-        // BLOQUE 4: RTD (Bebidas)
-        { id: 'R1', block: 'Bebidas', q: 'Durante tu jornada laboral, ¿compras bebidas listas para tomar?', opt: ['Sí, casi todos los días', 'Varias veces por semana', 'Ocasionalmente', 'Rara vez', 'Nunca'], type: 'single' },
-        { id: 'R2', block: 'Bebidas', q: '¿Cuál de estas opciones te resultaría más atractiva en tu día a día?', opt: ['Agua natural o saborizada', 'Jugo natural prensado / fresco', 'Té frío o infusión natural', 'Café latte y Matcha', 'Bebida funcional (energía/proteína)', 'Refrescante para el calor', 'No suelo comprar bebidas'], type: 'multi', max: 2 },
-        { id: 'R3', block: 'Bebidas', q: '¿Qué tipo de leche prefieres normalmente en tus bebidas?', opt: ['Leche entera', 'Leche deslactosada', 'Leche de almendra', 'Leche de avena', 'Leche de soya', 'No consumo leche'], type: 'multi', max: 2 },
-        { id: 'R4', block: 'Bebidas', q: '¿Qué precio te parece razonable para una bebida de buena calidad?', opt: ['Hasta $1.99', '$2.49 - $2.99', '$3.49 - $3.99', '$4.49 - $4.99', 'Más de $5.00'], type: 'single' },
+        { id: 'R1', b: 'Bebidas', q: 'Durante tu jornada laboral, ¿compras bebidas listas para tomar?', o: ['Sí, casi todos los días', 'Varias veces por semana', 'Ocasionalmente', 'Rara vez', 'Nunca'], t: 'single' },
+        { id: 'R2', b: 'Bebidas', q: '¿Cuál opción de bebida te resulta más atractiva?', o: ['Agua saborizada', 'Jugo natural prensado', 'Té frío o infusión', 'Café latte / Matcha', 'Bebida funcional', 'Refrescante', 'No suelo comprar'], t: 'multi', m: 2 },
+        { id: 'R3', b: 'Bebidas', q: '¿Qué tipo de leche prefieres en tus bebidas?', o: ['Entera', 'Deslactosada', 'Almendra', 'Avena', 'Soya', 'No consumo leche'], t: 'multi', m: 2 },
+        { id: 'R4', b: 'Bebidas', q: '¿Qué precio te parece razonable para una bebida de buena calidad?', o: ['Hasta $1.99', '$2.49 - $2.99', '$3.49 - $3.99', '$4.49 - $4.99', 'Más de $5.00'], t: 'single' },
         
-        // BLOQUE FINAL: PERFIL
-        { id: 'E1', block: 'Perfil', q: '¿Cuál es tu rango de edad?', opt: ['18-24', '25-34', '35-44', '45-54', '55+'], type: 'single' },
-        { id: 'Z1', block: 'Perfil', q: '¿En qué zona realizas la mayoría de tus actividades?', opt: ['Norte', 'Centro', 'Sur', 'Samborondón / Vía a la Costa', 'Durán'], type: 'single' }
+        { id: 'E1', b: 'Perfil', q: '¿Cuál es tu rango de edad?', o: ['18-24', '25-34', '35-44', '45-54', '55+'], t: 'single' },
+        { id: 'Z1', b: 'Perfil', q: '¿En qué zona realizas la mayoría de tus actividades?', o: ['Norte', 'Centro', 'Sur', 'Samborondón / Vía a la Costa', 'Durán'], t: 'single' }
     ];
 
     let current = 0;
-    let responses = {};
-    let multiSelection = [];
-    let adminClicks = 0;
+    let results = {};
+    let multiTemp = [];
+    let adminCounter = 0;
 
-    function init() {
-        renderProgress();
-        renderQuestion();
-    }
-
-    function renderProgress() {
-        const container = document.getElementById('progress-dots');
-        container.innerHTML = '';
-        questions.forEach((_, i) => {
-            const dot = document.createElement('div');
-            dot.className = `progress-dot ${i <= current ? 'active' : ''}`;
-            container.appendChild(dot);
-        });
-        document.getElementById('step-count').innerText = `${current + 1} / ${questions.length}`;
-    }
-
-    function renderQuestion() {
-        const item = questions[current];
-        const ui = document.getElementById('survey-content');
-        const footer = document.getElementById('survey-footer');
+    function render() {
+        const step = questions[current];
+        const container = document.getElementById('content');
+        const footer = document.getElementById('footer-actions');
         
-        document.getElementById('block-title').innerText = `Bloque: ${item.block}`;
-        multiSelection = [];
-        footer.classList.toggle('hidden', item.type === 'single');
+        // Actualizar UI
+        document.getElementById('label-bloque').innerText = `Bloque: ${step.b}`;
+        document.getElementById('label-paso').innerText = `${current + 1} / ${questions.length}`;
+        document.getElementById('progress-fill').style.width = `${((current) / questions.length) * 100}%`;
+        
+        multiTemp = [];
+        footer.classList.add('hidden');
 
         let html = `
             <div class="fade-in">
-                <h2 class="text-2xl font-black text-gray-800 leading-tight mb-8">${item.q}</h2>
-                <div class="space-y-1">
-                    ${item.opt.map(o => `
-                        <button onclick="selectOption('${o.replace(/'/g, "\\'")}')" class="option-btn group">
-                            <span>${o}</span>
-                            <div class="w-2 h-2 rounded-full bg-gray-100 group-[.option-selected]:bg-xigo"></div>
+                <h2 class="text-2xl font-bold text-slate-800 leading-tight mb-8">${step.q}</h2>
+                <div id="options-list">
+                    ${step.o.map((opt, i) => `
+                        <button onclick="handleSelect('${opt.replace(/'/g, "\\'")}')" class="option-btn">
+                            <span>${opt}</span>
+                            <div class="dot w-3 h-3 rounded-full bg-gray-100"></div>
                         </button>
                     `).join('')}
                 </div>
-                ${item.type === 'multi' ? `<p class="text-[10px] text-center text-gray-400 font-bold uppercase mt-6 italic">Selecciona hasta ${item.max}</p>` : ''}
+                ${step.t === 'multi' ? `<p class="text-[10px] text-center text-gray-400 mt-4 font-bold">PUEDES ELEGIR HASTA ${step.m} OPCIONES</p>` : ''}
             </div>
         `;
-        ui.innerHTML = html;
-        ui.scrollTop = 0;
+        container.innerHTML = html;
     }
 
-    window.selectOption = (val) => {
-        const item = questions[current];
-        if (item.type === 'single') {
-            if (item.exit && val === item.exit) return finishExit();
-            responses[item.id] = val;
-            goNext();
+    window.handleSelect = (val) => {
+        const step = questions[current];
+        if (step.t === 'single') {
+            if (step.exit && val === step.exit) return finishNoInteres();
+            results[step.id] = val;
+            nextStep();
         } else {
-            if (multiSelection.includes(val)) {
-                multiSelection = multiSelection.filter(x => x !== val);
-            } else if (multiSelection.length < item.max) {
-                multiSelection.push(val);
+            if (multiTemp.includes(val)) {
+                multiTemp = multiTemp.filter(x => x !== val);
+            } else if (multiTemp.length < step.m) {
+                multiTemp.push(val);
             }
-            updateMultiVisuals();
+            updateMultiUI();
+            document.getElementById('footer-actions').classList.remove('hidden');
         }
-    };
+    }
 
-    function updateMultiVisuals() {
-        document.querySelectorAll('.option-btn').forEach(btn => {
-            const text = btn.querySelector('span').innerText;
-            if (multiSelection.includes(text)) {
-                btn.classList.add('option-selected');
-            } else {
-                btn.classList.remove('option-selected');
-            }
+    function updateMultiUI() {
+        const btns = document.querySelectorAll('.option-btn');
+        btns.forEach(b => {
+            const txt = b.querySelector('span').innerText;
+            if (multiTemp.includes(txt)) b.classList.add('option-selected');
+            else b.classList.remove('option-selected');
         });
     }
 
-    window.handleNext = () => {
-        const item = questions[current];
-        if (item.type === 'multi' && multiSelection.length > 0) {
-            responses[item.id] = multiSelection;
-            goNext();
+    window.nextStep = () => {
+        if (questions[current].t === 'multi') {
+            results[questions[current].id] = multiTemp.join(", ");
         }
-    };
-
-    function goNext() {
+        
         current++;
-        if (current < questions.length) {
-            renderProgress();
-            renderQuestion();
-        } else {
-            renderFinal();
-        }
+        if (current < questions.length) render();
+        else renderEnd();
     }
 
-    function renderFinal() {
-        document.getElementById('survey-footer').classList.add('hidden');
-        document.getElementById('survey-content').innerHTML = `
+    function renderEnd() {
+        document.getElementById('progress-fill').style.width = "100%";
+        document.getElementById('footer-actions').classList.add('hidden');
+        document.getElementById('content').innerHTML = `
             <div class="text-center py-10 fade-in">
-                <div class="text-6xl mb-6">🥗</div>
-                <h2 class="text-3xl font-black text-gray-800 mb-4 uppercase italic">¡Excelente!</h2>
-                <p class="text-gray-500 font-medium mb-10 text-sm">Para recibir tu cupón del 15% en Vina María, ingresa tu correo:</p>
-                <input type="email" id="user-email" placeholder="Email para el cupón" class="w-full p-4 bg-gray-50 rounded-xl border-2 border-gray-100 focus:border-xigo outline-none text-center font-bold mb-6">
-                <button onclick="saveData()" class="w-full bg-xigo text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-xl">Reclamar Cupón</button>
+                <div class="text-5xl mb-6">🥗</div>
+                <h2 class="text-3xl font-black text-slate-800 mb-4 uppercase italic">¡TERMINAMOS!</h2>
+                <p class="text-gray-500 mb-8 text-sm">Ingresa tu correo para recibir tu <b>15% de descuento</b> en Vina María:</p>
+                <input type="email" id="email" placeholder="tu@email.com" class="w-full p-4 rounded-xl border-2 border-gray-100 mb-6 text-center font-bold">
+                <button onclick="finalSave()" class="w-full bg-green-700 text-white py-4 rounded-xl font-bold uppercase tracking-widest">Obtener Cupón</button>
             </div>
         `;
     }
 
-    function saveData() {
-        const email = document.getElementById('user-email').value;
-        if (!email.includes('@')) return alert("Ingresa un correo válido");
+    function finalSave() {
+        const mail = document.getElementById('email').value;
+        if (!mail.includes('@')) return alert("Por favor ingresa un correo válido");
         
-        const finalData = { email, responses, date: new Date().toISOString() };
-        
-        // Guardado local (Perfecto para GitHub Pages)
-        let storage = JSON.parse(localStorage.getItem('xigo_data') || '[]');
-        storage.push(finalData);
-        localStorage.setItem('xigo_data', JSON.stringify(storage));
+        const data = { email: mail, responses: results, date: new Date().toLocaleString() };
+        let db = JSON.parse(localStorage.getItem('xigo_results') || '[]');
+        db.push(data);
+        localStorage.setItem('xigo_results', JSON.stringify(db));
 
-        showCoupon();
-    }
-
-    function showCoupon() {
-        document.getElementById('survey-content').innerHTML = `
+        document.getElementById('content').innerHTML = `
             <div class="text-center py-10 fade-in">
-                <div class="w-20 h-20 bg-green-50 text-xigo rounded-full flex items-center justify-center mx-auto mb-8">
-                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                <div class="bg-green-50 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl font-bold">✓</div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tu código es:</p>
+                <div class="border-4 border-dashed border-gray-100 p-8 rounded-3xl mb-8">
+                    <h2 class="text-5xl font-black text-green-800 italic">XIGO15</h2>
                 </div>
-                <p class="text-gray-400 font-bold text-[10px] uppercase tracking-widest mb-2">Tu cupón es:</p>
-                <div class="bg-gray-50 border-4 border-dashed border-gray-200 p-8 rounded-3xl mb-8">
-                    <h2 class="text-xigo text-5xl font-black italic tracking-tighter">XIGO15</h2>
-                </div>
-                <p class="text-xs text-gray-500 italic px-4 leading-relaxed">Presenta este código o una captura en <b>@vinamariaec</b> para validar tu descuento.</p>
-                <button onclick="location.reload()" class="mt-12 text-gray-300 font-bold uppercase text-[9px] tracking-widest underline">Finalizar</button>
+                <p class="text-xs text-gray-400 italic">Muestra esta pantalla en @vinamariaec para canjear tu beneficio.</p>
+                <button onclick="location.reload()" class="mt-12 text-[10px] font-bold text-gray-300 underline uppercase">Cerrar</button>
             </div>
         `;
     }
 
-    function finishExit() {
-        document.getElementById('survey-content').innerHTML = `
-            <div class="text-center py-24 fade-in">
-                <p class="text-gray-400 font-bold uppercase text-xs tracking-widest">Gracias por tu interés en XIGO.</p>
-                <button onclick="location.reload()" class="mt-8 text-xigo font-black uppercase text-[10px] underline">Volver al inicio</button>
+    function finishNoInteres() {
+        document.getElementById('content').innerHTML = `
+            <div class="text-center py-20 fade-in">
+                <p class="text-gray-400 font-bold">Gracias por tu tiempo.</p>
+                <button onclick="location.reload()" class="mt-4 text-green-700 font-bold underline">Reiniciar</button>
             </div>
         `;
     }
 
-    // --- PANEL DE ADMINISTRACIÓN OCULTO ---
+    // ACCESO ADMIN: 5 clics en el logo
     document.getElementById('admin-trigger').onclick = () => {
-        adminClicks++;
-        if (adminClicks >= 5) {
-            adminClicks = 0;
-            const p = prompt("Acceso XIGO Admin:");
-            if (p === "2026") openAdmin();
+        adminCounter++;
+        if (adminCounter >= 5) {
+            adminCounter = 0;
+            if (prompt("Contraseña:") === "2026") showAdmin();
         }
-    };
-
-    function openAdmin() {
-        const data = JSON.parse(localStorage.getItem('xigo_data') || '[]');
-        const ui = document.getElementById('survey-content');
-        ui.innerHTML = `
-            <div class="fade-in space-y-6">
-                <div class="bg-gray-900 text-white p-6 rounded-3xl">
-                    <p class="text-[10px] font-bold text-xigo uppercase">Respuestas Totales</p>
-                    <h3 class="text-5xl font-black italic">${data.length}</h3>
-                    <button onclick="exportCSV()" class="mt-4 w-full bg-xigo py-3 rounded-xl font-bold uppercase text-xs">Descargar CSV (Excel)</button>
-                </div>
-                <div class="space-y-2">
-                    ${data.slice(-5).reverse().map(d => `
-                        <div class="p-3 bg-gray-50 rounded-xl text-[10px] flex justify-between">
-                            <span class="font-bold">${d.email}</span>
-                            <span class="text-gray-300">${new Date(d.date).toLocaleDateString()}</span>
-                        </div>
-                    `).join('')}
-                </div>
-                <button onclick="location.reload()" class="w-full py-4 text-gray-400 font-bold text-[10px] uppercase">Salir</button>
-            </div>
-        `;
     }
 
-    window.exportCSV = () => {
-        const data = JSON.parse(localStorage.getItem('xigo_data') || '[]');
-        if (data.length === 0) return alert("No hay datos");
-        
-        const headers = ["Email", "Fecha", ...questions.map(q => q.id)];
-        const rows = data.map(d => [
-            d.email, 
-            d.date, 
-            ...questions.map(q => {
-                const r = d.responses[q.id] || "";
-                return Array.isArray(r) ? r.join(";") : r;
-            })
-        ].join(","));
+    function showAdmin() {
+        const db = JSON.parse(localStorage.getItem('xigo_results') || '[]');
+        let html = `<div class="p-4"><h2 class="font-bold mb-4">Admin: ${db.length} respuestas</h2>`;
+        html += `<button onclick="downloadCSV()" class="bg-blue-600 text-white p-2 rounded w-full mb-4">Bajar Excel (CSV)</button>`;
+        db.reverse().forEach(r => {
+            html += `<div class="text-[9px] border-b py-2"><b>${r.email}</b> - ${r.date}</div>`;
+        });
+        html += `<button onclick="location.reload()" class="mt-4 w-full">Salir</button></div>`;
+        document.getElementById('content').innerHTML = html;
+    }
 
-        const content = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.join("\n");
-        const encodedUri = encodeURI(content);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "XIGO_RESULTADOS.csv");
-        document.body.appendChild(link);
-        link.click();
-    };
+    window.downloadCSV = () => {
+        const db = JSON.parse(localStorage.getItem('xigo_results') || '[]');
+        let csv = "Email,Fecha," + questions.map(q => q.id).join(",") + "\n";
+        db.forEach(r => {
+            let row = [r.email, r.date];
+            questions.forEach(q => row.push(`"${r.responses[q.id] || ''}"`));
+            csv += row.join(",") + "\n";
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'resultados_xigo.csv';
+        a.click();
+    }
 
-    window.onload = init;
+    window.onload = render;
 </script>
+
 </body>
 </html>
